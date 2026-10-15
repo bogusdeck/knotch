@@ -1,0 +1,67 @@
+# Example developer-oriented NotchDeck configuration
+# Place this at ~/.config/notchdeck/config.toml
+
+[general]
+screen = "builtin"
+hover_to_peek = true
+peek_delay_ms = 150
+launch_at_login = true
+copy_on_drop = false
+
+[shortcuts]
+toggle = "cmd+shift+space"
+quick_note = "cmd+shift+n"
+
+[appearance]
+theme = "dark"
+accent = "#7C5CFF"
+expanded_width = 680
+expanded_height = 280
+corner_radius = 22
+
+[layout]
+tabs = ["home", "notes", "shelf", "terminal", "vpn", "crypto"]
+home = ["media", "clock", "calendar", "vpn-status", "git-branch"]
+
+# Windscribe VPN Action Widget
+[[widgets]]
+id = "vpn-status"
+type = "action"
+title = "Windscribe"
+icon = "lock.shield"
+status_command = "windscribe-cli status"
+status_interval_s = 10
+status_regex = "Connected"
+[[widgets.buttons]]
+label = "Connect"
+command = "windscribe-cli connect"
+[[widgets.buttons]]
+label = "Disconnect"
+command = "windscribe-cli disconnect"
+
+# Shell Widget: Current Git Branch in active project
+[[widgets]]
+id = "git-branch"
+type = "shell"
+title = "Git Branch"
+icon = "arrow.triangle.branch"
+command = "git -C ~/projects/my-app rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'main'"
+interval_s = 5
+
+# Terminal Preset: Dev Server
+[[widgets]]
+id = "dev-server"
+type = "terminal"
+title = "Next.js"
+cwd = "~/projects/my-app"
+command = "npm run dev"
+autostart = false
+
+# Web Widget: Crypto Price Monitor
+[[widgets]]
+id = "crypto"
+type = "web"
+title = "Crypto"
+icon = "bitcoinsign.circle"
+path = "widgets/crypto"
+allow_shell = false

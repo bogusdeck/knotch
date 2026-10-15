@@ -18,6 +18,7 @@ final class NotchViewModel: ObservableObject {
 
     @Published var state: NotchState = .collapsed
     @Published var activeTab: NotchTab = .home
+    @Published var activeCustomTabId: String? = nil
 
     /// Non-nil when config.toml has a parse or I/O error
     @Published var configError: ConfigError? = nil

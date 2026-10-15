@@ -34,15 +34,39 @@ struct ExpandedView: View {
 
     // MARK: - Tab bar
 
+    private var customTabs: [AnyNotchWidget] {
+        let configuredTabIds = configManager.config.layout.tabs
+        return configuredTabIds.compactMap { tabId in
+            if NotchTab(rawValue: tabId) == nil {
+                return widgetRegistry.widget(id: tabId)
+            }
+            return nil
+        }
+    }
+
     private var tabBar: some View {
         HStack(spacing: 0) {
             ForEach(NotchTab.allCases, id: \.self) { tab in
-                TabButton(tab: tab, isSelected: viewModel.activeTab == tab) {
+                TabButton(tab: tab, isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == tab) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        viewModel.activeCustomTabId = nil
                         viewModel.activeTab = tab
                     }
                 }
             }
+
+            ForEach(customTabs) { widget in
+                CustomTabButton(
+                    id: widget.id,
+                    title: widget.title,
+                    isSelected: viewModel.activeCustomTabId == widget.id
+                ) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        viewModel.activeCustomTabId = widget.id
+                    }
+                }
+            }
+
             Spacer()
             // Close / collapse button
             Button {
@@ -63,29 +87,34 @@ struct ExpandedView: View {
 
     @ViewBuilder
     private var tabContent: some View {
-        switch viewModel.activeTab {
-        case .home:
-            HomeDashboardView(
-                configManager: configManager,
-                mediaManager: mediaManager,
-                calendarManager: calendarManager,
-                widgetRegistry: widgetRegistry
-            )
-        case .notes:
-            NotesView(notesManager: notesManager, viewModel: viewModel)
-        case .shelf:
-            ShelfView(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop)
-        case .terminal:
-            TerminalPlaceholderView()
-        case .vpn:
-            if let widget = widgetRegistry.widget(id: "vpn-status") {
-                widget.expandedView()
-                    .padding(14)
-            } else if let firstAction = widgetRegistry.widgets.first(where: { $0.id.contains("vpn") || $0.id.contains("status") }) {
-                firstAction.expandedView()
-                    .padding(14)
-            } else {
-                VPNPlaceholderView()
+        if let customId = viewModel.activeCustomTabId, let widget = widgetRegistry.widget(id: customId) {
+            widget.expandedView()
+                .padding(10)
+        } else {
+            switch viewModel.activeTab {
+            case .home:
+                HomeDashboardView(
+                    configManager: configManager,
+                    mediaManager: mediaManager,
+                    calendarManager: calendarManager,
+                    widgetRegistry: widgetRegistry
+                )
+            case .notes:
+                NotesView(notesManager: notesManager, viewModel: viewModel)
+            case .shelf:
+                ShelfView(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop)
+            case .terminal:
+                TerminalView()
+            case .vpn:
+                if let widget = widgetRegistry.widget(id: "vpn-status") {
+                    widget.expandedView()
+                        .padding(14)
+                } else if let firstAction = widgetRegistry.widgets.first(where: { $0.id.contains("vpn") || $0.id.contains("status") }) {
+                    firstAction.expandedView()
+                        .padding(14)
+                } else {
+                    VPNPlaceholderView()
+                }
             }
         }
     }
@@ -105,6 +134,33 @@ private struct TabButton: View {
                     .imageScale(.small)
                 Text(tab.displayName)
                     .font(.system(size: 9, weight: .medium))
+            }
+            .foregroundStyle(isSelected ? .white : .white.opacity(0.45))
+            .frame(width: 52, height: 36)
+            .background(
+                isSelected
+                    ? RoundedRectangle(cornerRadius: 8).fill(.white.opacity(0.08))
+                    : nil
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct CustomTabButton: View {
+    let id: String
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Image(systemName: "square.dashed")
+                    .imageScale(.small)
+                Text(title)
+                    .font(.system(size: 9, weight: .medium))
+                    .lineLimit(1)
             }
             .foregroundStyle(isSelected ? .white : .white.opacity(0.45))
             .frame(width: 52, height: 36)

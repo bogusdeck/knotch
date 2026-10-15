@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Widget</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="title">🪙 Crypto Hub</span>
+      <button id="refreshBtn" class="refresh-btn">↻</button>
+    </div>
+
+    <div class="price-cards">
+      <div class="card" id="card-btc">
+        <span class="symbol">BTC</span>
+        <span class="price" id="btc-price">$67,420</span>
+        <span class="change positive" id="btc-change">+2.4%</span>
+      </div>
+
+      <div class="card" id="card-eth">
+        <span class="symbol">ETH</span>
+        <span class="price" id="eth-price">$3,510</span>
+        <span class="change positive" id="eth-change">+1.8%</span>
+      </div>
+
+      <div class="card" id="card-sol">
+        <span class="symbol">SOL</span>
+        <span class="price" id="sol-price">$185</span>
+        <span class="change negative" id="sol-change">-0.5%</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span id="last-update" class="timestamp">Updated just now</span>
+      <button id="notifyBtn" class="notify-btn">Alert</button>
+    </div>
+  </div>
+
+  <script src="widget.js"></script>
+</body>
+</html>

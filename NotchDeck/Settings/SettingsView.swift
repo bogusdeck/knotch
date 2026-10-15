@@ -94,6 +94,23 @@ struct SettingsView: View {
                 Toggle("Launch at Login", isOn: $draftConfig.general.launchAtLogin)
             }
 
+            Section("Software Updates") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("NotchDeck v0.1.0")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Text("Powered by Sparkle updater")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Check for Updates…") {
+                        UpdaterManager.shared.checkForUpdates()
+                    }
+                }
+            }
+
             saveActionBar
         }
         .formStyle(.grouped)

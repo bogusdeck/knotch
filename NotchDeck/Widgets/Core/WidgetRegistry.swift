@@ -75,6 +75,23 @@ final class WidgetRegistry: ObservableObject {
                 let shellWidget = ShellWidget(config: cfg)
                 shellWidgets[cfg.id] = shellWidget
                 register(shellWidget)
+            case "web":
+                var dict: [String: Any] = [
+                    "id": cfg.id,
+                    "type": cfg.type,
+                    "title": cfg.title,
+                    "allow_shell": cfg.allowShell
+                ]
+                if let p = cfg.path { dict["path"] = p }
+                let webWidget = WebWidget(
+                    id: cfg.id,
+                    title: cfg.title,
+                    iconName: cfg.icon ?? "globe",
+                    relativePath: cfg.path,
+                    allowShell: cfg.allowShell,
+                    rawConfig: dict
+                )
+                register(webWidget)
             default:
                 break
             }

@@ -54,7 +54,9 @@ final class NotchPanelController: NSObject {
         widgetRegistry.register(NotesWidget(notesManager: notesManager, viewModel: viewModel))
         widgetRegistry.register(ShelfWidget(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop))
         widgetRegistry.register(MediaWidget(mediaManager: mediaManager))
+        widgetRegistry.register(TerminalWidget())
         widgetRegistry.syncConfiguredWidgets(configs: configManager.config.widgets)
+        TerminalManager.shared.syncConfiguredSessions(widgets: configManager.config.widgets)
 
         observeConfig()
     }
@@ -76,6 +78,7 @@ final class NotchPanelController: NSObject {
             .sink { [weak self] newConfig in
                 guard let self else { return }
                 self.widgetRegistry.syncConfiguredWidgets(configs: newConfig.widgets)
+                TerminalManager.shared.syncConfiguredSessions(widgets: newConfig.widgets)
                 if self.viewModel.state != .collapsed {
                     self.resizePanel(for: self.viewModel.state, animated: true)
                 }
@@ -169,6 +172,9 @@ final class NotchPanelController: NSObject {
         expand()
         if let tab = NotchTab(rawValue: id) {
             viewModel.activeTab = tab
+            viewModel.activeCustomTabId = nil
+        } else {
+            viewModel.activeCustomTabId = id
         }
     }
 

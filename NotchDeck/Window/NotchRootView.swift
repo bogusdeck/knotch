@@ -80,11 +80,18 @@ struct NotchRootView: View {
     private var contentLayer: some View {
         switch viewModel.state {
         case .collapsed:
-            if let media = mediaManager.currentMedia, media.isPlaying {
-                collapsedMediaAccessory(media)
-                    .transition(.opacity)
-            } else {
-                EmptyView()
+            HStack(spacing: 0) {
+                if TerminalManager.shared.hasRunningServers {
+                    collapsedServerStatusDot
+                        .transition(.opacity)
+                }
+
+                Spacer()
+
+                if let media = mediaManager.currentMedia, media.isPlaying {
+                    collapsedMediaAccessory(media)
+                        .transition(.opacity)
+                }
             }
 
         case .peek:
@@ -132,6 +139,18 @@ struct NotchRootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         .padding(.trailing, 6)
         .padding(.bottom, 2)
+    }
+
+    // MARK: - Collapsed Server Status Dot
+
+    private var collapsedServerStatusDot: some View {
+        Circle()
+            .fill(Color.green)
+            .frame(width: 5, height: 5)
+            .shadow(color: .green.opacity(0.8), radius: 2)
+            .padding(.leading, 8)
+            .padding(.bottom, 3)
+            .frame(maxHeight: .infinity, alignment: .bottomLeading)
     }
 
     // MARK: - Drop Handling
