@@ -1,0 +1,80 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & Test (Xcode ${{ matrix.xcode }})
+    runs-on: macos-14
+    strategy:
+      matrix:
+        xcode: ["16.0"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: NotchDeck
+        run: xcodegen generate
+
+      - name: Resolve SPM dependencies
+        working-directory: NotchDeck
+        run: |
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project NotchDeck.xcodeproj \
+            -scheme NotchDeck
+
+      - name: Build
+        working-directory: NotchDeck
+        run: |
+          xcodebuild \
+            -project NotchDeck.xcodeproj \
+            -scheme NotchDeck \
+            -configuration Debug \
+            -destination "platform=macOS,arch=arm64" \
+            -skipPackagePluginValidation \
+            build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            | xcpretty
+
+      - name: Test
+        working-directory: NotchDeck
+        run: |
+          xcodebuild \
+            -project NotchDeck.xcodeproj \
+            -scheme NotchDeckTests \
+            -configuration Debug \
+            -destination "platform=macOS,arch=arm64" \
+            -skipPackagePluginValidation \
+            test \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            | xcpretty
+
+  lint:
+    name: SwiftLint
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      - name: Lint
+        working-directory: NotchDeck
+        run: swiftlint --strict
