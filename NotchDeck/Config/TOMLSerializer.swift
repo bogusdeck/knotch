@@ -18,6 +18,7 @@ enum TOMLSerializer {
         lines.append("hover_to_peek = \(config.general.hoverToPeek)")
         lines.append("peek_delay_ms = \(config.general.peekDelayMs)")
         lines.append("launch_at_login = \(config.general.launchAtLogin)")
+        lines.append("copy_on_drop = \(config.general.copyOnDrop)")
         lines.append("")
 
         // [shortcuts]

@@ -31,6 +31,18 @@ final class NotchViewModel: ObservableObject {
     /// Geometry is updated on screen-change notifications.
     @Published var geometry: NotchGeometry
 
+    /// Callbacks invoked when a view needs to trigger panel window expansion/collapse
+    var onExpandRequested: (@MainActor () -> Void)?
+    var onCollapseRequested: (@MainActor () -> Void)?
+
+    func requestExpand() {
+        onExpandRequested?()
+    }
+
+    func requestCollapse() {
+        onCollapseRequested?()
+    }
+
     // MARK: - Init
 
     init(geometry: NotchGeometry) {

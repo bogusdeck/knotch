@@ -19,6 +19,7 @@ struct GeneralConfig: Sendable, Equatable {
     var hoverToPeek: Bool = true
     var peekDelayMs: Int = 150
     var launchAtLogin: Bool = false
+    var copyOnDrop: Bool = false
 
     static let `default` = GeneralConfig()
 }

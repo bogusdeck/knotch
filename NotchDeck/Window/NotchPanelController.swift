@@ -29,6 +29,10 @@ final class NotchPanelController: NSObject {
     /// Cancellables for config observers
     private var cancellables = Set<AnyCancellable>()
 
+    let notesManager = NotesManager()
+    let shelfManager = ShelfManager()
+    let widgetRegistry = WidgetRegistry()
+
     // MARK: - Init
 
     init(configManager: ConfigManager) {
@@ -37,6 +41,17 @@ final class NotchPanelController: NSObject {
         self.panel         = NotchPanel()
         self.viewModel     = NotchViewModel(geometry: geometry)
         super.init()
+
+        viewModel.onExpandRequested = { [weak self] in
+            self?.expand()
+        }
+        viewModel.onCollapseRequested = { [weak self] in
+            self?.collapse()
+        }
+
+        widgetRegistry.register(NotesWidget(notesManager: notesManager, viewModel: viewModel))
+        widgetRegistry.register(ShelfWidget(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop))
+
         observeConfig()
     }
 
@@ -66,7 +81,12 @@ final class NotchPanelController: NSObject {
     // MARK: - Show
 
     func show() {
-        let rootView = NotchRootView(viewModel: viewModel)
+        let rootView = NotchRootView(
+            viewModel: viewModel,
+            configManager: configManager,
+            notesManager: notesManager,
+            shelfManager: shelfManager
+        )
         let hostingView = NSHostingView(rootView: rootView)
         hostingView.layer?.backgroundColor = .clear
 

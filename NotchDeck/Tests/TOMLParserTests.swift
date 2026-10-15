@@ -13,6 +13,7 @@ final class TOMLParserTests: XCTestCase {
     hover_to_peek = true
     peek_delay_ms = 150
     launch_at_login = true
+    copy_on_drop = false
 
     [shortcuts]
     toggle = "cmd+shift+space"
@@ -66,6 +67,7 @@ final class TOMLParserTests: XCTestCase {
         XCTAssertTrue(config.general.hoverToPeek)
         XCTAssertEqual(config.general.peekDelayMs, 150)
         XCTAssertTrue(config.general.launchAtLogin)
+        XCTAssertFalse(config.general.copyOnDrop)
 
         // Shortcuts
         XCTAssertEqual(config.shortcuts.toggle, "cmd+shift+space")

@@ -7,6 +7,9 @@ import SwiftUI
 struct ExpandedView: View {
 
     @ObservedObject var viewModel: NotchViewModel
+    @ObservedObject var configManager: ConfigManager
+    @ObservedObject var notesManager: NotesManager
+    @ObservedObject var shelfManager: ShelfManager
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,7 +43,7 @@ struct ExpandedView: View {
             Spacer()
             // Close / collapse button
             Button {
-                viewModel.state = .collapsed
+                viewModel.requestCollapse()
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .imageScale(.medium)
@@ -61,9 +64,9 @@ struct ExpandedView: View {
         case .home:
             HomeView()
         case .notes:
-            NotesPlaceholderView(viewModel: viewModel)
+            NotesView(notesManager: notesManager, viewModel: viewModel)
         case .shelf:
-            ShelfPlaceholderView()
+            ShelfView(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop)
         case .terminal:
             TerminalPlaceholderView()
         case .vpn:
@@ -131,7 +134,7 @@ private struct HomeView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Welcome to NotchDeck")
                     .font(.headline)
-                Text("Phase 1 — window & animations complete.")
+                Text("Phase 3 — Quick notes & file shelf ready.")
                     .font(.caption)
                     .opacity(0.6)
             }
@@ -151,37 +154,6 @@ private struct HomeView: View {
 }
 
 // MARK: - Placeholder views (replaced in subsequent phases)
-
-private struct NotesPlaceholderView: View {
-    @ObservedObject var viewModel: NotchViewModel
-    @FocusState private var isFocused: Bool
-    @State private var text = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Quick Note")
-                .font(.caption.weight(.semibold))
-                .opacity(0.5)
-            TextEditor(text: $text)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .background(.clear)
-                .focused($isFocused)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onSubmit { /* save note — Phase 3 */ }
-        }
-        .padding(12)
-        .onChange(of: viewModel.requestFocusOnNoteInput) { _, new in
-            if new { isFocused = true; viewModel.requestFocusOnNoteInput = false }
-        }
-    }
-}
-
-private struct ShelfPlaceholderView: View {
-    var body: some View {
-        placeholderLabel("Shelf — drop files here (Phase 3)")
-    }
-}
 
 private struct TerminalPlaceholderView: View {
     var body: some View {
