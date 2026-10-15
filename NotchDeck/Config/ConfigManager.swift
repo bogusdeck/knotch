@@ -160,6 +160,7 @@ screen = "builtin"
 hover_to_peek = true
 peek_delay_ms = 150
 launch_at_login = false
+copy_on_drop = false
 
 [shortcuts]
 toggle = "cmd+shift+space"
@@ -177,20 +178,19 @@ tabs = ["home", "notes", "shelf", "terminal", "vpn"]
 home = ["media", "clock", "calendar", "vpn-status"]
 
 # ── Widget definitions ────────────────────────────────────────────────────
-# Uncomment and edit to add widgets.
 
-# [[widgets]]
-# id = "vpn-status"
-# type = "action"
-# title = "Windscribe"
-# icon = "lock.shield"
-# status_command = "windscribe-cli status"
-# status_interval_s = 10
-# status_regex = "Connected"
-# [[widgets.buttons]]
-# label = "Connect"
-# command = "windscribe-cli connect"
-# [[widgets.buttons]]
-# label = "Disconnect"
-# command = "windscribe-cli disconnect"
+[[widgets]]
+id = "vpn-status"
+type = "action"
+title = "Windscribe"
+icon = "lock.shield"
+status_command = "windscribe-cli status"
+status_interval_s = 10
+status_regex = "Connected"
+[[widgets.buttons]]
+label = "Connect"
+command = "windscribe-cli connect"
+[[widgets.buttons]]
+label = "Disconnect"
+command = "windscribe-cli disconnect"
 """

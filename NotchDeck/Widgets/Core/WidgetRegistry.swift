@@ -1,6 +1,5 @@
 // WidgetRegistry.swift
 // Maintains the ordered list of active widgets derived from config.toml.
-// Phase 1: scaffolding only. Phase 2 populates from config.
 
 import Combine
 import Foundation
@@ -15,6 +14,13 @@ final class WidgetRegistry: ObservableObject {
     // MARK: - Published state
 
     @Published private(set) var widgets: [AnyNotchWidget] = []
+
+    // Built-in widget IDs that shouldn't be removed during dynamic config sync
+    private let builtInIds: Set<String> = ["notes", "shelf", "media", "terminal", "clock", "calendar"]
+
+    // Keep strong references to ObservableObject widgets so their async polling tasks stay alive
+    private var actionWidgets: [String: ActionWidget] = [:]
+    private var shellWidgets: [String: ShellWidget] = [:]
 
     // MARK: - Registration
 
@@ -32,6 +38,11 @@ final class WidgetRegistry: ObservableObject {
 
     /// Removes the widget with the given id.
     func unregister(id: String) {
+        actionWidgets[id]?.stopPolling()
+        actionWidgets.removeValue(forKey: id)
+        shellWidgets[id]?.stopPolling()
+        shellWidgets.removeValue(forKey: id)
+
         widgets.removeAll { $0.id == id }
         logger.debug("Unregistered widget: \(id)")
     }
@@ -39,5 +50,36 @@ final class WidgetRegistry: ObservableObject {
     /// Returns the widget with the given id, if registered.
     func widget(id: String) -> AnyNotchWidget? {
         widgets.first { $0.id == id }
+    }
+
+    // MARK: - Dynamic Config Sync
+
+    /// Synchronizes action, shell, and custom widgets defined in config.toml.
+    func syncConfiguredWidgets(configs: [WidgetConfig]) {
+        let activeConfigIds = Set(configs.map(\.id))
+
+        // Remove stale dynamic widgets
+        let toRemove = widgets.filter { !builtInIds.contains($0.id) && !activeConfigIds.contains($0.id) }
+        for w in toRemove {
+            unregister(id: w.id)
+        }
+
+        // Add or update widgets from config
+        for cfg in configs {
+            switch cfg.type {
+            case "action":
+                let actionWidget = ActionWidget(config: cfg)
+                actionWidgets[cfg.id] = actionWidget
+                register(actionWidget)
+            case "shell":
+                let shellWidget = ShellWidget(config: cfg)
+                shellWidgets[cfg.id] = shellWidget
+                register(shellWidget)
+            default:
+                break
+            }
+        }
+
+        logger.info("Synchronized \(self.widgets.count) total widgets in registry")
     }
 }

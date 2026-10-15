@@ -18,7 +18,7 @@ NotchDeck turns the MacBook notch into a live productivity hub: quick notes, a f
 | 1 | Notch window · collapsed / peek / expanded · toggle shortcut | ✅ |
 | 2 | TOML config · hot-reload · error banner · Settings window | ✅ |
 | 3 | Quick notes · file shelf | ✅ |
-| 4 | Media widget · action & shell widgets | 🔜 |
+| 4 | Media widget · action & shell widgets · Calendar & Clock | ✅ |
 | 5 | Embedded terminal · web widget bridge · Sparkle auto-updates | 🔜 |
 
 ---

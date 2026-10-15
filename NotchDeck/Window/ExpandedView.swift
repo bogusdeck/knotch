@@ -10,6 +10,9 @@ struct ExpandedView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var notesManager: NotesManager
     @ObservedObject var shelfManager: ShelfManager
+    @ObservedObject var mediaManager: MediaManager
+    @ObservedObject var calendarManager: CalendarManager
+    @ObservedObject var widgetRegistry: WidgetRegistry
 
     var body: some View {
         VStack(spacing: 0) {
@@ -62,7 +65,12 @@ struct ExpandedView: View {
     private var tabContent: some View {
         switch viewModel.activeTab {
         case .home:
-            HomeView()
+            HomeDashboardView(
+                configManager: configManager,
+                mediaManager: mediaManager,
+                calendarManager: calendarManager,
+                widgetRegistry: widgetRegistry
+            )
         case .notes:
             NotesView(notesManager: notesManager, viewModel: viewModel)
         case .shelf:
@@ -70,7 +78,15 @@ struct ExpandedView: View {
         case .terminal:
             TerminalPlaceholderView()
         case .vpn:
-            VPNPlaceholderView()
+            if let widget = widgetRegistry.widget(id: "vpn-status") {
+                widget.expandedView()
+                    .padding(14)
+            } else if let firstAction = widgetRegistry.widgets.first(where: { $0.id.contains("vpn") || $0.id.contains("status") }) {
+                firstAction.expandedView()
+                    .padding(14)
+            } else {
+                VPNPlaceholderView()
+            }
         }
     }
 }
@@ -126,34 +142,69 @@ extension NotchTab {
     }
 }
 
-// MARK: - Home view
+// MARK: - Home Dashboard View
 
-private struct HomeView: View {
+struct HomeDashboardView: View {
+    @ObservedObject var configManager: ConfigManager
+    @ObservedObject var mediaManager: MediaManager
+    @ObservedObject var calendarManager: CalendarManager
+    @ObservedObject var widgetRegistry: WidgetRegistry
+
     var body: some View {
-        HStack(spacing: 24) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Welcome to NotchDeck")
-                    .font(.headline)
-                Text("Phase 3 — Quick notes & file shelf ready.")
-                    .font(.caption)
-                    .opacity(0.6)
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                ForEach(configManager.config.layout.home, id: \.self) { widgetId in
+                    homeTile(for: widgetId)
+                }
             }
-            Spacer()
-            // Live clock tile
-            VStack(spacing: 2) {
-                Text(Date(), format: .dateTime.hour().minute().second())
-                    .font(.system(size: 28, weight: .thin, design: .rounded))
-                    .monospacedDigit()
-                Text(Date(), format: .dateTime.day().month(.wide).year())
-                    .font(.caption2)
-                    .opacity(0.6)
+            .padding(14)
+        }
+    }
+
+    @ViewBuilder
+    private func homeTile(for widgetId: String) -> some View {
+        switch widgetId {
+        case "media":
+            MediaView(mediaManager: mediaManager)
+        case "clock":
+            ClockTile()
+        case "calendar":
+            CalendarWidgetTile(calendarManager: calendarManager)
+        default:
+            if let dynamicWidget = widgetRegistry.widget(id: widgetId) {
+                dynamicWidget.expandedView()
             }
         }
-        .padding(16)
     }
 }
 
-// MARK: - Placeholder views (replaced in subsequent phases)
+// MARK: - Clock Tile
+
+struct ClockTile: View {
+    var body: some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Date(), format: .dateTime.hour().minute().second())
+                    .font(.system(size: 24, weight: .light, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide).year())
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Placeholder views
 
 private struct TerminalPlaceholderView: View {
     var body: some View {
@@ -163,7 +214,18 @@ private struct TerminalPlaceholderView: View {
 
 private struct VPNPlaceholderView: View {
     var body: some View {
-        placeholderLabel("VPN widget — action widget (Phase 4)")
+        VStack(spacing: 6) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 24))
+                .foregroundStyle(.white.opacity(0.3))
+            Text("No VPN action widget defined in config.toml")
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.5))
+            Text("Add an action widget with id = 'vpn-status' in config.toml")
+                .font(.system(size: 9))
+                .foregroundStyle(.white.opacity(0.3))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

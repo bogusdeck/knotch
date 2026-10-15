@@ -12,6 +12,9 @@ struct NotchRootView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var notesManager: NotesManager
     @ObservedObject var shelfManager: ShelfManager
+    @ObservedObject var mediaManager: MediaManager
+    @ObservedObject var calendarManager: CalendarManager
+    @ObservedObject var widgetRegistry: WidgetRegistry
 
     @State private var isDragHoveringNotch: Bool = false
 
@@ -77,11 +80,15 @@ struct NotchRootView: View {
     private var contentLayer: some View {
         switch viewModel.state {
         case .collapsed:
-            // Nothing visible — the panel frame matches the notch exactly
-            EmptyView()
+            if let media = mediaManager.currentMedia, media.isPlaying {
+                collapsedMediaAccessory(media)
+                    .transition(.opacity)
+            } else {
+                EmptyView()
+            }
 
         case .peek:
-            PeekView(viewModel: viewModel)
+            PeekView(viewModel: viewModel, mediaManager: mediaManager)
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.state)
 
@@ -90,11 +97,41 @@ struct NotchRootView: View {
                 viewModel: viewModel,
                 configManager: configManager,
                 notesManager: notesManager,
-                shelfManager: shelfManager
+                shelfManager: shelfManager,
+                mediaManager: mediaManager,
+                calendarManager: calendarManager,
+                widgetRegistry: widgetRegistry
             )
             .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: viewModel.state)
         }
+    }
+
+    // MARK: - Collapsed Media Accessory
+
+    private func collapsedMediaAccessory(_ media: MediaItem) -> some View {
+        HStack(spacing: 5) {
+            if let artwork = media.artwork {
+                Image(nsImage: artwork)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 14, height: 14)
+                    .cornerRadius(3)
+            } else {
+                Image(systemName: "music.note")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.purple)
+            }
+
+            AudioWaveView(isPlaying: true, color: .purple)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Color.black.opacity(0.8))
+        .cornerRadius(6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .padding(.trailing, 6)
+        .padding(.bottom, 2)
     }
 
     // MARK: - Drop Handling

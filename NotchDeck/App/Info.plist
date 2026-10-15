@@ -36,5 +36,9 @@
     <string>https://example.com/notchdeck/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string></string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>NotchDeck displays upcoming calendar events in the notch hub.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>NotchDeck displays upcoming calendar events in the notch hub.</string>
 </dict>
 </plist>

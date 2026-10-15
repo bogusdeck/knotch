@@ -1,12 +1,13 @@
 // PeekView.swift
 // Compact view shown when the user hovers over the notch.
-// Displays a minimal live summary: time + what's playing.
+// Displays live time + what's playing with audio wave.
 
 import SwiftUI
 
 struct PeekView: View {
 
     @ObservedObject var viewModel: NotchViewModel
+    @ObservedObject var mediaManager: MediaManager
 
     var body: some View {
         HStack(spacing: 14) {
@@ -17,7 +18,7 @@ struct PeekView: View {
                 .frame(height: 20)
                 .overlay(.white.opacity(0.2))
 
-            // "Now playing" placeholder (replaced in Phase 4)
+            // Now playing section
             nowPlayingSection
         }
         .padding(.horizontal, 18)
@@ -40,13 +41,34 @@ struct PeekView: View {
 
     private var nowPlayingSection: some View {
         HStack(spacing: 6) {
-            Image(systemName: "music.note")
-                .imageScale(.small)
-                .opacity(0.7)
-            Text("Nothing playing")
-                .font(.system(size: 11, weight: .regular))
-                .opacity(0.6)
-                .lineLimit(1)
+            if let media = mediaManager.currentMedia {
+                if let artwork = media.artwork {
+                    Image(nsImage: artwork)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 18, height: 18)
+                        .cornerRadius(4)
+                } else {
+                    Image(systemName: "music.note")
+                        .imageScale(.small)
+                        .foregroundStyle(.purple)
+                }
+
+                Text("\(media.title) — \(media.artist)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                AudioWaveView(isPlaying: media.isPlaying, color: .purple)
+            } else {
+                Image(systemName: "music.note")
+                    .imageScale(.small)
+                    .opacity(0.4)
+                Text("Nothing playing")
+                    .font(.system(size: 11, weight: .regular))
+                    .opacity(0.5)
+                    .lineLimit(1)
+            }
         }
     }
 }

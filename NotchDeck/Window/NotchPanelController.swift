@@ -31,6 +31,8 @@ final class NotchPanelController: NSObject {
 
     let notesManager = NotesManager()
     let shelfManager = ShelfManager()
+    let mediaManager = MediaManager()
+    let calendarManager = CalendarManager()
     let widgetRegistry = WidgetRegistry()
 
     // MARK: - Init
@@ -51,6 +53,8 @@ final class NotchPanelController: NSObject {
 
         widgetRegistry.register(NotesWidget(notesManager: notesManager, viewModel: viewModel))
         widgetRegistry.register(ShelfWidget(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop))
+        widgetRegistry.register(MediaWidget(mediaManager: mediaManager))
+        widgetRegistry.syncConfiguredWidgets(configs: configManager.config.widgets)
 
         observeConfig()
     }
@@ -69,8 +73,9 @@ final class NotchPanelController: NSObject {
 
         configManager.$config
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
+            .sink { [weak self] newConfig in
                 guard let self else { return }
+                self.widgetRegistry.syncConfiguredWidgets(configs: newConfig.widgets)
                 if self.viewModel.state != .collapsed {
                     self.resizePanel(for: self.viewModel.state, animated: true)
                 }
@@ -85,7 +90,10 @@ final class NotchPanelController: NSObject {
             viewModel: viewModel,
             configManager: configManager,
             notesManager: notesManager,
-            shelfManager: shelfManager
+            shelfManager: shelfManager,
+            mediaManager: mediaManager,
+            calendarManager: calendarManager,
+            widgetRegistry: widgetRegistry
         )
         let hostingView = NSHostingView(rootView: rootView)
         hostingView.layer?.backgroundColor = .clear
