@@ -17,6 +17,7 @@ struct AppConfig: Sendable, Equatable {
 struct GeneralConfig: Sendable, Equatable {
     var screen: String = "builtin"
     var hoverToPeek: Bool = true
+    var hoverToExpand: Bool = true
     var peekDelayMs: Int = 150
     var launchAtLogin: Bool = false
     var copyOnDrop: Bool = false

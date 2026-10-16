@@ -25,6 +25,10 @@ struct PeekView: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .foregroundStyle(.white)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            viewModel.requestExpand()
+        }
     }
 
     // MARK: - Sub-views

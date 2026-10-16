@@ -158,6 +158,7 @@ let defaultConfigTOML = """
 [general]
 screen = "builtin"
 hover_to_peek = true
+hover_to_expand = true
 peek_delay_ms = 150
 launch_at_login = false
 copy_on_drop = false

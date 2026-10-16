@@ -54,6 +54,7 @@ enum TOMLParser {
         var general = GeneralConfig.default
         if let v = table["screen"]?.string { general.screen = v }
         if let v = table["hover_to_peek"]?.bool { general.hoverToPeek = v }
+        if let v = table["hover_to_expand"]?.bool { general.hoverToExpand = v }
         if let v = table["peek_delay_ms"]?.int { general.peekDelayMs = v }
         if let v = table["launch_at_login"]?.bool { general.launchAtLogin = v }
         if let v = table["copy_on_drop"]?.bool { general.copyOnDrop = v }

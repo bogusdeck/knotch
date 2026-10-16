@@ -74,8 +74,9 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Peek Behavior") {
-                Toggle("Hover to Peek", isOn: $draftConfig.general.hoverToPeek)
+            Section("Hover & Peek Behavior") {
+                Toggle("Hover to Open Dashboard", isOn: $draftConfig.general.hoverToExpand)
+                Toggle("Hover to Peek (Compact Preview)", isOn: $draftConfig.general.hoverToPeek)
                 HStack {
                     Text("Peek Delay")
                     Spacer()

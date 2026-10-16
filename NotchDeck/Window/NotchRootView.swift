@@ -57,6 +57,46 @@ struct NotchRootView: View {
             viewModel.state = .collapsed
             return .handled
         }
+        // Click to expand from collapsed or peek state
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if viewModel.state == .collapsed || viewModel.state == .peek {
+                viewModel.requestExpand()
+            }
+        }
+        // Hover tracking directly in SwiftUI
+        .onHover { isHovered in
+            handleHover(isHovered)
+        }
+    }
+
+    private func handleHover(_ isHovered: Bool) {
+        if isHovered {
+            if viewModel.state == .collapsed {
+                let delayMs = configManager.config.general.peekDelayMs
+                Task {
+                    try? await Task.sleep(nanoseconds: UInt64(delayMs) * 1_000_000)
+                    guard !Task.isCancelled else { return }
+                    if configManager.config.general.hoverToExpand {
+                        viewModel.requestExpand()
+                    } else if configManager.config.general.hoverToPeek {
+                        viewModel.requestPeek()
+                    }
+                }
+            }
+        } else {
+            if viewModel.state == .peek {
+                viewModel.requestCollapse()
+            } else if viewModel.state == .expanded && configManager.config.general.hoverToExpand {
+                if !viewModel.requestFocusOnNoteInput {
+                    Task {
+                        try? await Task.sleep(nanoseconds: 350_000_000)
+                        guard !Task.isCancelled else { return }
+                        viewModel.requestCollapse()
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Background shape

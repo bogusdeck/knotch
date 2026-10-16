@@ -16,6 +16,7 @@ enum TOMLSerializer {
         lines.append("[general]")
         lines.append("screen = \"\(escape(config.general.screen))\"")
         lines.append("hover_to_peek = \(config.general.hoverToPeek)")
+        lines.append("hover_to_expand = \(config.general.hoverToExpand)")
         lines.append("peek_delay_ms = \(config.general.peekDelayMs)")
         lines.append("launch_at_login = \(config.general.launchAtLogin)")
         lines.append("copy_on_drop = \(config.general.copyOnDrop)")

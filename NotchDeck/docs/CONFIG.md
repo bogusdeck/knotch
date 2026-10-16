@@ -13,7 +13,8 @@ Hot-reload is supported: save the file and changes apply immediately (Phase 2+).
 |-----|------|---------|-------------|
 | `screen` | string | `"builtin"` | Which display to use. `"builtin"` selects the built-in MacBook display; use `0`, `1`, … for external screens. |
 | `hover_to_peek` | bool | `true` | Show a quick-glance peek when the cursor enters the notch area. |
-| `peek_delay_ms` | int | `150` | Milliseconds to wait before transitioning from collapsed → peek. |
+| `hover_to_expand` | bool | `true` | Open the full dashboard automatically on mouse hover. |
+| `peek_delay_ms` | int | `150` | Milliseconds to wait before transitioning from collapsed → peek/expanded. |
 | `launch_at_login` | bool | `false` | Register NotchDeck as a login item via `SMAppService`. |
 | `copy_on_drop` | bool | `false` | When `true`, files dropped onto the shelf or notch are copied into `~/.config/notchdeck/shelf/files/` instead of referenced. |
 

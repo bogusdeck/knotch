@@ -50,6 +50,9 @@ final class NotchPanelController: NSObject {
         viewModel.onCollapseRequested = { [weak self] in
             self?.collapse()
         }
+        viewModel.onPeekRequested = { [weak self] in
+            self?.peek()
+        }
 
         widgetRegistry.register(NotesWidget(notesManager: notesManager, viewModel: viewModel))
         widgetRegistry.register(ShelfWidget(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop))
@@ -190,9 +193,12 @@ final class NotchPanelController: NSObject {
                 ctx.timingFunction    = CAMediaTimingFunction(name: .easeInEaseOut)
                 ctx.allowsImplicitAnimation = true
                 panel.animator().setFrame(targetFrame, display: true)
+            } completionHandler: { [weak self] in
+                self?.installHoverTracking()
             }
         } else {
             panel.setFrame(targetFrame, display: true)
+            installHoverTracking()
         }
     }
 
@@ -265,19 +271,43 @@ final class NotchPanelController: NSObject {
 extension NotchPanelController {
 
     func mouseEntered(with event: NSEvent) {
+        handleHoverEnter()
+    }
+
+    func handleHoverEnter() {
         guard viewModel.state == .collapsed else { return }
         let delayMs = configManager.config.general.peekDelayMs
         peekTimer?.cancel()
         peekTimer = Task {
             try? await Task.sleep(nanoseconds: UInt64(delayMs) * 1_000_000)
-            if !Task.isCancelled { self.peek() }
+            guard !Task.isCancelled else { return }
+            if self.configManager.config.general.hoverToExpand {
+                self.expand()
+            } else if self.configManager.config.general.hoverToPeek {
+                self.peek()
+            }
         }
     }
 
     func mouseExited(with event: NSEvent) {
+        handleHoverExit()
+    }
+
+    func handleHoverExit() {
         peekTimer?.cancel()
         if viewModel.state == .peek {
             collapse()
+        } else if viewModel.state == .expanded && configManager.config.general.hoverToExpand {
+            // Check if note input has active focus
+            guard !viewModel.requestFocusOnNoteInput else { return }
+            peekTimer = Task {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                guard !Task.isCancelled else { return }
+                let mouseLocation = NSEvent.mouseLocation
+                if !self.panel.frame.contains(mouseLocation) {
+                    self.collapse()
+                }
+            }
         }
     }
 }
