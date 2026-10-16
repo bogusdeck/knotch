@@ -165,7 +165,7 @@ struct MediaView: View {
                 Text("Nothing Playing")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.7))
-                Text("Play audio in Spotify or Apple Music")
+                Text("Play media in any browser or music app")
                     .font(.system(size: 10))
                     .foregroundStyle(.white.opacity(0.4))
             }
