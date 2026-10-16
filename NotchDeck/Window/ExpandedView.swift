@@ -34,6 +34,13 @@ struct ExpandedView: View {
 
     // MARK: - Tab bar
 
+    private struct TabItemModel: Identifiable {
+        let id: String
+        let title: String
+        let iconName: String
+        let builtInTab: NotchTab?
+    }
+
     private var customTabs: [AnyNotchWidget] {
         let configuredTabIds = configManager.config.layout.tabs
         return configuredTabIds.compactMap { tabId in
@@ -44,43 +51,119 @@ struct ExpandedView: View {
         }
     }
 
-    private var tabBar: some View {
-        HStack(spacing: 0) {
-            ForEach(NotchTab.allCases, id: \.self) { tab in
-                TabButton(tab: tab, isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == tab) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        viewModel.activeCustomTabId = nil
-                        viewModel.activeTab = tab
-                    }
-                }
-            }
+    private var allTabItems: [TabItemModel] {
+        var items: [TabItemModel] = [
+            TabItemModel(id: "home", title: "Home", iconName: "square.grid.2x2", builtInTab: .home),
+            TabItemModel(id: "notes", title: "Notes", iconName: "note.text", builtInTab: .notes),
+            TabItemModel(id: "shelf", title: "Shelf", iconName: "tray.2", builtInTab: .shelf),
+            TabItemModel(id: "terminal", title: "Terminal", iconName: "terminal", builtInTab: .terminal),
+            TabItemModel(id: "vpn", title: "VPN", iconName: "lock.shield", builtInTab: .vpn)
+        ]
 
-            ForEach(customTabs) { widget in
-                CustomTabButton(
+        for widget in customTabs {
+            items.append(
+                TabItemModel(
                     id: widget.id,
                     title: widget.title,
-                    isSelected: viewModel.activeCustomTabId == widget.id
-                ) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        viewModel.activeCustomTabId = widget.id
-                    }
+                    iconName: "square.dashed",
+                    builtInTab: nil
+                )
+            )
+        }
+        return items
+    }
+
+    private var leftTabs: [TabItemModel] {
+        Array(allTabItems.prefix(3))
+    }
+
+    private var rightTabs: [TabItemModel] {
+        Array(allTabItems.dropFirst(3))
+    }
+
+    private var notchCenterCutout: some View {
+        Button {
+            viewModel.requestCollapse()
+        } label: {
+            ZStack {
+                Rectangle()
+                    .fill(Color.clear)
+
+                VStack(spacing: 2) {
+                    Image(systemName: "chevron.compact.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.35))
+                    Text("notch")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.2))
                 }
             }
-
-            Spacer()
-            // Close / collapse button
-            Button {
-                viewModel.requestCollapse()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .imageScale(.medium)
-                    .foregroundStyle(.white.opacity(0.5))
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 12)
+            .frame(width: max(viewModel.geometry.notchFrame.width + 16, 175), height: 36)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 8)
+        .buttonStyle(.plain)
+        .help("Click notch to close")
+    }
+
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            // Left tabs (3 tabs: Home, Notes, Shelf)
+            HStack(spacing: 4) {
+                ForEach(leftTabs) { item in
+                    renderTabButton(item)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Center Notch cutout — matches hardware notch, clicking closes!
+            notchCenterCutout
+
+            // Right tabs (Terminal, VPN, etc.) + Close Button
+            HStack(spacing: 4) {
+                ForEach(rightTabs) { item in
+                    renderTabButton(item)
+                }
+
+                // Close / collapse button
+                Button {
+                    viewModel.requestCollapse()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .imageScale(.medium)
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 6)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(.horizontal, 10)
         .frame(height: 36)
+    }
+
+    @ViewBuilder
+    private func renderTabButton(_ item: TabItemModel) -> some View {
+        if let tab = item.builtInTab {
+            TabButton(
+                tab: tab,
+                isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == tab
+            ) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    viewModel.activeCustomTabId = nil
+                    viewModel.activeTab = tab
+                }
+            }
+        } else {
+            CustomTabButton(
+                id: item.id,
+                title: item.title,
+                isSelected: viewModel.activeCustomTabId == item.id
+            ) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    viewModel.activeCustomTabId = item.id
+                }
+            }
+        }
     }
 
     // MARK: - Tab content
