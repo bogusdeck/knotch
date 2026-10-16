@@ -58,6 +58,7 @@ enum TOMLParser {
         if let v = table["peek_delay_ms"]?.int { general.peekDelayMs = v }
         if let v = table["launch_at_login"]?.bool { general.launchAtLogin = v }
         if let v = table["copy_on_drop"]?.bool { general.copyOnDrop = v }
+        if let v = table["show_menu_bar_icon"]?.bool { general.showMenuBarIcon = v }
         return general
     }
 

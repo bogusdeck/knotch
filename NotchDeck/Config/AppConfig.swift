@@ -21,6 +21,7 @@ struct GeneralConfig: Sendable, Equatable {
     var peekDelayMs: Int = 150
     var launchAtLogin: Bool = false
     var copyOnDrop: Bool = false
+    var showMenuBarIcon: Bool = false
 
     static let `default` = GeneralConfig()
 }

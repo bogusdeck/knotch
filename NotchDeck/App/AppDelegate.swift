@@ -68,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newConfig in
                 self?.applyShortcuts(from: newConfig)
+                self?.setupStatusItem()
             }
             .store(in: &cancellables)
     }
@@ -95,16 +96,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Status item
 
     private func setupStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let button = statusItem?.button {
-            button.image = NSImage(
-                systemSymbolName: "rectangle.topthird.inset.filled",
-                accessibilityDescription: "NotchDeck"
-            )
-            button.action = #selector(statusItemClicked)
-            button.target = self
+        let shouldShow = configManager?.config.general.showMenuBarIcon ?? false
+        if shouldShow {
+            if statusItem == nil {
+                let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+                if let button = item.button {
+                    button.image = NSImage(
+                        systemSymbolName: "rectangle.topthird.inset.filled",
+                        accessibilityDescription: "NotchDeck"
+                    )
+                    button.action = #selector(statusItemClicked)
+                    button.target = self
+                }
+                item.menu = buildStatusMenu()
+                self.statusItem = item
+            }
+        } else {
+            if let existing = statusItem {
+                NSStatusBar.system.removeStatusItem(existing)
+                self.statusItem = nil
+            }
         }
-        statusItem?.menu = buildStatusMenu()
     }
 
     @objc private func statusItemClicked() {
