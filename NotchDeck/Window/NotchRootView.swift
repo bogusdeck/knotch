@@ -72,6 +72,12 @@ struct NotchRootView: View {
             height: viewModel.state == .collapsed ? viewModel.geometry.notchFrame.height : nil,
             alignment: .top
         )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if viewModel.state == .collapsed || viewModel.state == .peek {
+                viewModel.requestExpand()
+            }
+        }
         .animation(
             .spring(response: 0.35, dampingFraction: 0.75),
             value: viewModel.state
@@ -85,29 +91,53 @@ struct NotchRootView: View {
     private var contentLayer: some View {
         switch viewModel.state {
         case .collapsed:
-            HStack(spacing: 0) {
-                if TerminalManager.shared.hasRunningServers {
-                    collapsedServerStatusDot
-                        .transition(.opacity)
-                }
+            ZStack {
+                // Invisible solid hit target filling the entire panel frame
+                Color.black.opacity(0.001)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
 
-                Spacer()
+                HStack(spacing: 0) {
+                    if TerminalManager.shared.hasRunningServers {
+                        collapsedServerStatusDot
+                            .transition(.opacity)
+                    }
 
-                if let media = mediaManager.currentMedia, media.isPlaying {
-                    collapsedMediaAccessory(media)
-                        .transition(.opacity)
+                    Spacer()
+
+                    if let media = mediaManager.currentMedia, media.isPlaying {
+                        collapsedMediaAccessory(media)
+                            .transition(.opacity)
+                    }
                 }
+                .padding(.horizontal, 12)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
             .onTapGesture {
                 viewModel.requestExpand()
             }
+            .onHover { isHovering in
+                guard isHovering else { return }
+                if configManager.config.general.hoverToExpand {
+                    viewModel.requestExpand()
+                } else if configManager.config.general.hoverToPeek {
+                    viewModel.requestPeek()
+                }
+            }
 
         case .peek:
             PeekView(viewModel: viewModel, mediaManager: mediaManager)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     viewModel.requestExpand()
+                }
+                .onHover { isHovering in
+                    guard isHovering else { return }
+                    if configManager.config.general.hoverToExpand {
+                        viewModel.requestExpand()
+                    }
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.state)

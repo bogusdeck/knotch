@@ -122,8 +122,7 @@ final class NotchPanelController: NSObject {
     // MARK: - Positioning
 
     private func positionPanel() {
-        // In collapsed state the panel exactly overlaps the notch
-        let collapsedFrame = geometry.notchFrame
+        let collapsedFrame = panelFrame(for: .collapsed)
         panel.setFrame(collapsedFrame, display: false)
     }
 
