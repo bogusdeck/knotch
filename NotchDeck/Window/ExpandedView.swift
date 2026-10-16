@@ -143,8 +143,8 @@ struct ExpandedView: View {
     @ViewBuilder
     private func renderTabButton(_ item: TabItemModel) -> some View {
         if let tab = item.builtInTab {
-            if tab == .vpn, let vpnWidget = (widgetRegistry.widget(id: "vpn-status") as? ActionWidget) ?? (widgetRegistry.widgets.first(where: { $0.id.contains("vpn") }) as? ActionWidget) {
-                VPNTopBarToggle(widget: vpnWidget, isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == .vpn) {
+            if tab == .vpn, let vpnWidget = widgetRegistry.actionWidget(id: "vpn-status") ?? widgetRegistry.allActionWidgets.first(where: { $0.id.contains("vpn") }) {
+                VPNTopBarToggle(widget: vpnWidget, isSelected: false) {
                     // Single click = instant direct toggle without opening any card!
                     if let toggleBtn = vpnWidget.config.buttons.first(where: { $0.label.lowercased().contains("toggle") }) {
                         Task { await vpnWidget.executeButton(toggleBtn) }
@@ -152,10 +152,7 @@ struct ExpandedView: View {
                         Task { await vpnWidget.executeButton(firstBtn) }
                     }
                 } onOpenTab: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        viewModel.activeCustomTabId = nil
-                        viewModel.activeTab = .vpn
-                    }
+                    // User does not want to open card; keep on current tab
                 }
             } else {
                 TabButton(
@@ -204,13 +201,11 @@ struct ExpandedView: View {
             case .terminal:
                 TerminalView()
             case .vpn:
-                if let actionWidget = widgetRegistry.widget(id: "vpn-status") as? ActionWidget {
+                if let actionWidget = widgetRegistry.actionWidget(id: "vpn-status") ?? widgetRegistry.allActionWidgets.first(where: { $0.id.contains("vpn") }) {
                     VPNView(widget: actionWidget)
                 } else if let widget = widgetRegistry.widget(id: "vpn-status") {
                     widget.expandedView()
                         .padding(14)
-                } else if let firstAction = widgetRegistry.widgets.first(where: { $0.id.contains("vpn") || $0.id.contains("status") }) as? ActionWidget {
-                    VPNView(widget: firstAction)
                 } else {
                     VPNPlaceholderView()
                 }

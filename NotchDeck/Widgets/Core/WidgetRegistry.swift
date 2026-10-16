@@ -52,6 +52,16 @@ final class WidgetRegistry: ObservableObject {
         widgets.first { $0.id == id }
     }
 
+    /// Returns the typed ActionWidget with the given id, if registered.
+    func actionWidget(id: String) -> ActionWidget? {
+        actionWidgets[id]
+    }
+
+    /// Returns all typed ActionWidgets.
+    var allActionWidgets: [ActionWidget] {
+        Array(actionWidgets.values)
+    }
+
     // MARK: - Dynamic Config Sync
 
     /// Synchronizes action, shell, and custom widgets defined in config.toml.
