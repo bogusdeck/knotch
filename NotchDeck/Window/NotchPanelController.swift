@@ -206,7 +206,15 @@ final class NotchPanelController: NSObject {
         let cfg = configManager.config.appearance
         switch state {
         case .collapsed:
-            return geometry.notchFrame
+            let base = geometry.notchFrame
+            let padX: CGFloat = 16
+            let padBottom: CGFloat = 8
+            return CGRect(
+                x: base.minX - padX,
+                y: base.minY - padBottom,
+                width: base.width + (padX * 2),
+                height: base.height + padBottom
+            )
 
         case .peek:
             let w = geometry.notchFrame.width + 80
@@ -271,12 +279,14 @@ final class NotchPanelController: NSObject {
 extension NotchPanelController {
 
     func mouseEntered(with event: NSEvent) {
+        // Always cancel any pending collapse timer if mouse is back inside
+        peekTimer?.cancel()
         handleHoverEnter()
     }
 
     func handleHoverEnter() {
         guard viewModel.state == .collapsed else { return }
-        let delayMs = configManager.config.general.peekDelayMs
+        let delayMs = min(configManager.config.general.peekDelayMs, 60)
         peekTimer?.cancel()
         peekTimer = Task {
             try? await Task.sleep(nanoseconds: UInt64(delayMs) * 1_000_000)
@@ -298,10 +308,10 @@ extension NotchPanelController {
         if viewModel.state == .peek {
             collapse()
         } else if viewModel.state == .expanded && configManager.config.general.hoverToExpand {
-            // Check if note input has active focus
+            // Keep expanded if note input or text field is actively focused
             guard !viewModel.requestFocusOnNoteInput else { return }
             peekTimer = Task {
-                try? await Task.sleep(nanoseconds: 350_000_000)
+                try? await Task.sleep(nanoseconds: 700_000_000) // 700ms grace period
                 guard !Task.isCancelled else { return }
                 let mouseLocation = NSEvent.mouseLocation
                 if !self.panel.frame.contains(mouseLocation) {

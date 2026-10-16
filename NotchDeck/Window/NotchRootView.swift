@@ -64,39 +64,6 @@ struct NotchRootView: View {
                 viewModel.requestExpand()
             }
         }
-        // Hover tracking directly in SwiftUI
-        .onHover { isHovered in
-            handleHover(isHovered)
-        }
-    }
-
-    private func handleHover(_ isHovered: Bool) {
-        if isHovered {
-            if viewModel.state == .collapsed {
-                let delayMs = configManager.config.general.peekDelayMs
-                Task {
-                    try? await Task.sleep(nanoseconds: UInt64(delayMs) * 1_000_000)
-                    guard !Task.isCancelled else { return }
-                    if configManager.config.general.hoverToExpand {
-                        viewModel.requestExpand()
-                    } else if configManager.config.general.hoverToPeek {
-                        viewModel.requestPeek()
-                    }
-                }
-            }
-        } else {
-            if viewModel.state == .peek {
-                viewModel.requestCollapse()
-            } else if viewModel.state == .expanded && configManager.config.general.hoverToExpand {
-                if !viewModel.requestFocusOnNoteInput {
-                    Task {
-                        try? await Task.sleep(nanoseconds: 350_000_000)
-                        guard !Task.isCancelled else { return }
-                        viewModel.requestCollapse()
-                    }
-                }
-            }
-        }
     }
 
     // MARK: - Background shape
@@ -107,6 +74,11 @@ struct NotchRootView: View {
             state: viewModel.state
         )
         .fill(.black)
+        .frame(
+            width: viewModel.state == .collapsed ? viewModel.geometry.notchFrame.width : nil,
+            height: viewModel.state == .collapsed ? viewModel.geometry.notchFrame.height : nil,
+            alignment: .top
+        )
         .animation(
             .spring(response: 0.35, dampingFraction: 0.75),
             value: viewModel.state
