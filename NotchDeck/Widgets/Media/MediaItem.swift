@@ -15,8 +15,14 @@ struct MediaItem: Sendable, Equatable {
     let artworkData: Data?
 
     var artwork: NSImage? {
-        guard let artworkData else { return nil }
-        return NSImage(data: artworkData)
+        if let artworkData, let img = NSImage(data: artworkData) {
+            return img
+        }
+        if let bundleIdentifier,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            return NSWorkspace.shared.icon(forFile: appURL.path)
+        }
+        return nil
     }
 
     var progress: Double {
