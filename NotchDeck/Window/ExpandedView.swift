@@ -14,6 +14,8 @@ struct ExpandedView: View {
     @ObservedObject var calendarManager: CalendarManager
     @ObservedObject var widgetRegistry: WidgetRegistry
 
+    @State private var isNotchHovered: Bool = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Narrow gap from the top of the panel (where the notch merges)
@@ -86,22 +88,26 @@ struct ExpandedView: View {
             viewModel.requestCollapse()
         } label: {
             ZStack {
-                Rectangle()
-                    .fill(Color.clear)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isNotchHovered ? Color.white.opacity(0.06) : Color.clear)
 
                 VStack(spacing: 2) {
                     Image(systemName: "chevron.compact.up")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(isNotchHovered ? .white.opacity(0.7) : .white.opacity(0.35))
                     Text("notch")
                         .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.2))
+                        .foregroundStyle(isNotchHovered ? .white.opacity(0.5) : .white.opacity(0.2))
                 }
             }
-            .frame(width: max(viewModel.geometry.notchFrame.width + 16, 175), height: 36)
+            .frame(width: max(viewModel.geometry.notchFrame.width + 16, 175), height: 34)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isNotchHovered = hovering
+        }
         .help("Click notch to close")
     }
 
@@ -125,15 +131,10 @@ struct ExpandedView: View {
                 }
 
                 // Close / collapse button
-                Button {
+                TabCloseButton {
                     viewModel.requestCollapse()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .imageScale(.medium)
-                        .foregroundStyle(.white.opacity(0.5))
                 }
-                .buttonStyle(.plain)
-                .padding(.leading, 6)
+                .padding(.leading, 4)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -210,23 +211,35 @@ private struct TabButton: View {
     let isSelected: Bool
     let action: () -> Void
 
+    @State private var isHovered: Bool = false
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
                 Image(systemName: tab.iconName)
-                    .imageScale(.small)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 Text(tab.displayName)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+                    .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? .white : .white.opacity(0.45))
-            .frame(width: 52, height: 36)
+            .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.9) : .white.opacity(0.45)))
+            .frame(minWidth: 56, maxWidth: 66)
+            .frame(height: 34)
             .background(
-                isSelected
-                    ? RoundedRectangle(cornerRadius: 8).fill(.white.opacity(0.08))
-                    : nil
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        isSelected
+                            ? Color.white.opacity(0.14)
+                            : (isHovered ? Color.white.opacity(0.07) : Color.clear)
+                    )
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
 
@@ -236,24 +249,60 @@ private struct CustomTabButton: View {
     let isSelected: Bool
     let action: () -> Void
 
+    @State private var isHovered: Bool = false
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
                 Image(systemName: "square.dashed")
-                    .imageScale(.small)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 Text(title)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? .white : .white.opacity(0.45))
-            .frame(width: 52, height: 36)
+            .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.9) : .white.opacity(0.45)))
+            .frame(minWidth: 56, maxWidth: 66)
+            .frame(height: 34)
             .background(
-                isSelected
-                    ? RoundedRectangle(cornerRadius: 8).fill(.white.opacity(0.08))
-                    : nil
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        isSelected
+                            ? Color.white.opacity(0.14)
+                            : (isHovered ? Color.white.opacity(0.07) : Color.clear)
+                    )
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
+private struct TabCloseButton: View {
+    let action: () -> Void
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 15))
+                .foregroundStyle(isHovered ? .white.opacity(0.9) : .white.opacity(0.45))
+                .frame(width: 32, height: 32)
+                .background(
+                    Circle()
+                        .fill(isHovered ? Color.white.opacity(0.1) : Color.clear)
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .help("Close notch")
     }
 }
 

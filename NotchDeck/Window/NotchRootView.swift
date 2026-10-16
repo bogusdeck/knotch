@@ -57,13 +57,6 @@ struct NotchRootView: View {
             viewModel.state = .collapsed
             return .handled
         }
-        // Click to expand from collapsed or peek state
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if viewModel.state == .collapsed || viewModel.state == .peek {
-                viewModel.requestExpand()
-            }
-        }
     }
 
     // MARK: - Background shape
@@ -105,9 +98,17 @@ struct NotchRootView: View {
                         .transition(.opacity)
                 }
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                viewModel.requestExpand()
+            }
 
         case .peek:
             PeekView(viewModel: viewModel, mediaManager: mediaManager)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    viewModel.requestExpand()
+                }
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.state)
 
