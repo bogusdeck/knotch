@@ -202,7 +202,7 @@ struct ActionWidgetTile: View {
                 Text(widget.lastOutput)
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.6))
-                    .lineLimit(2)
+                    .lineLimit(4)
                     .padding(6)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.white.opacity(0.04))
@@ -247,8 +247,10 @@ struct ActionWidgetTile: View {
 
     private func buttonColor(for label: String) -> Color {
         let lower = label.lowercased()
-        if lower.contains("connect") || lower.contains("start") || lower.contains("up") {
-            return .purple.opacity(0.8)
+        if lower.contains("toggle") {
+            return widget.status == .active ? Color.red.opacity(0.8) : Color.green.opacity(0.8)
+        } else if lower.contains("connect") || lower.contains("start") || lower.contains("up") {
+            return .green.opacity(0.8)
         } else if lower.contains("disconnect") || lower.contains("stop") || lower.contains("down") {
             return .red.opacity(0.7)
         }

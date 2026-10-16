@@ -18,10 +18,7 @@ struct ExpandedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Narrow gap from the top of the panel (where the notch merges)
-            Spacer().frame(height: 8)
-
-            // Tab bar
+            // Tab bar matching notch height
             tabBar
 
             Divider().overlay(.white.opacity(0.1))
@@ -88,19 +85,20 @@ struct ExpandedView: View {
             viewModel.requestCollapse()
         } label: {
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 6)
                     .fill(isNotchHovered ? Color.white.opacity(0.06) : Color.clear)
 
-                VStack(spacing: 2) {
+                HStack(spacing: 4) {
                     Image(systemName: "chevron.compact.up")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(isNotchHovered ? .white.opacity(0.7) : .white.opacity(0.35))
                     Text("notch")
                         .font(.system(size: 8, weight: .medium))
                         .foregroundStyle(isNotchHovered ? .white.opacity(0.5) : .white.opacity(0.2))
                 }
             }
-            .frame(width: max(viewModel.geometry.notchFrame.width + 16, 175), height: 34)
+            .frame(width: max(viewModel.geometry.notchFrame.width + 16, 175))
+            .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -134,12 +132,12 @@ struct ExpandedView: View {
                 TabCloseButton {
                     viewModel.requestCollapse()
                 }
-                .padding(.leading, 4)
+                .padding(.leading, 3)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 10)
-        .frame(height: 36)
+        .padding(.horizontal, 8)
+        .frame(height: max(viewModel.geometry.notchFrame.height, 30))
     }
 
     @ViewBuilder
@@ -190,12 +188,13 @@ struct ExpandedView: View {
             case .terminal:
                 TerminalView()
             case .vpn:
-                if let widget = widgetRegistry.widget(id: "vpn-status") {
+                if let actionWidget = widgetRegistry.widget(id: "vpn-status") as? ActionWidget {
+                    VPNView(widget: actionWidget)
+                } else if let widget = widgetRegistry.widget(id: "vpn-status") {
                     widget.expandedView()
                         .padding(14)
-                } else if let firstAction = widgetRegistry.widgets.first(where: { $0.id.contains("vpn") || $0.id.contains("status") }) {
-                    firstAction.expandedView()
-                        .padding(14)
+                } else if let firstAction = widgetRegistry.widgets.first(where: { $0.id.contains("vpn") || $0.id.contains("status") }) as? ActionWidget {
+                    VPNView(widget: firstAction)
                 } else {
                     VPNPlaceholderView()
                 }
@@ -215,18 +214,18 @@ private struct TabButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            HStack(spacing: 5) {
                 Image(systemName: tab.iconName)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                 Text(tab.displayName)
                     .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.9) : .white.opacity(0.45)))
-            .frame(minWidth: 56, maxWidth: 66)
-            .frame(height: 34)
+            .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.9) : .white.opacity(0.5)))
+            .padding(.horizontal, 7)
+            .frame(height: 22)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 6)
                     .fill(
                         isSelected
                             ? Color.white.opacity(0.14)
@@ -253,18 +252,18 @@ private struct CustomTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            HStack(spacing: 5) {
                 Image(systemName: "square.dashed")
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                 Text(title)
                     .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.9) : .white.opacity(0.45)))
-            .frame(minWidth: 56, maxWidth: 66)
-            .frame(height: 34)
+            .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.9) : .white.opacity(0.5)))
+            .padding(.horizontal, 7)
+            .frame(height: 22)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 6)
                     .fill(
                         isSelected
                             ? Color.white.opacity(0.14)
@@ -288,9 +287,9 @@ private struct TabCloseButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 15))
+                .font(.system(size: 13))
                 .foregroundStyle(isHovered ? .white.opacity(0.9) : .white.opacity(0.45))
-                .frame(width: 32, height: 32)
+                .frame(width: 22, height: 22)
                 .background(
                     Circle()
                         .fill(isHovered ? Color.white.opacity(0.1) : Color.clear)
@@ -422,4 +421,123 @@ private func placeholderLabel(_ text: String) -> some View {
         .font(.caption)
         .opacity(0.4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+}
+
+// MARK: - Dedicated VPN View
+
+struct VPNView: View {
+    @ObservedObject var widget: ActionWidget
+
+    var isConnected: Bool {
+        widget.status == .active
+    }
+
+    var body: some View {
+        HStack(spacing: 24) {
+            // Left: Status Shield
+            VStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(isConnected ? Color.green.opacity(0.15) : Color.white.opacity(0.06))
+                        .frame(width: 64, height: 64)
+
+                    Image(systemName: isConnected ? "lock.shield.fill" : "lock.shield")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(isConnected ? Color.green : Color.white.opacity(0.5))
+                }
+
+                Text(widget.status.label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isConnected ? Color.green : Color.white.opacity(0.6))
+            }
+            .frame(width: 110)
+
+            Divider()
+                .overlay(Color.white.opacity(0.1))
+                .frame(height: 100)
+
+            // Right: Info & Controls
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(widget.title)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    Spacer()
+
+                    // Refresh
+                    Button {
+                        Task { await widget.pollStatus() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Refresh VPN status")
+                }
+
+                if !widget.lastOutput.isEmpty {
+                    Text(widget.lastOutput)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(4)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white.opacity(0.04))
+                        .cornerRadius(6)
+                }
+
+                // Action buttons
+                if !widget.config.buttons.isEmpty {
+                    HStack(spacing: 10) {
+                        ForEach(widget.config.buttons, id: \.label) { button in
+                            Button {
+                                Task { await widget.executeButton(button) }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    if button.label.lowercased().contains("toggle") {
+                                        Image(systemName: "power")
+                                    } else if button.label.lowercased().contains("connect") && !button.label.lowercased().contains("dis") {
+                                        Image(systemName: "bolt.fill")
+                                    } else if button.label.lowercased().contains("disconnect") {
+                                        Image(systemName: "stop.fill")
+                                    }
+                                    Text(button.label)
+                                        .fontWeight(.medium)
+                                }
+                                .font(.system(size: 11))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(buttonColor(for: button.label))
+                                .foregroundStyle(.white)
+                                .cornerRadius(7)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(widget.isExecuting)
+                        }
+
+                        if widget.isExecuting {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func buttonColor(for label: String) -> Color {
+        let lower = label.lowercased()
+        if lower.contains("toggle") {
+            return isConnected ? Color.red.opacity(0.8) : Color.green.opacity(0.8)
+        } else if lower.contains("connect") && !lower.contains("dis") {
+            return Color.green.opacity(0.7)
+        } else if lower.contains("disconnect") {
+            return Color.red.opacity(0.7)
+        }
+        return Color.white.opacity(0.15)
+    }
 }

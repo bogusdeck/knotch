@@ -97,9 +97,16 @@ struct NotchRootView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
 
-                HStack(spacing: 0) {
+                HStack(spacing: 6) {
                     if TerminalManager.shared.hasRunningServers {
                         collapsedServerStatusDot
+                            .transition(.opacity)
+                    }
+
+                    if let vpn = widgetRegistry.widget(id: "vpn-status") as? ActionWidget, vpn.status == .active {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.green)
                             .transition(.opacity)
                     }
 
@@ -117,14 +124,6 @@ struct NotchRootView: View {
             .onTapGesture {
                 viewModel.requestExpand()
             }
-            .onHover { isHovering in
-                guard isHovering else { return }
-                if configManager.config.general.hoverToExpand {
-                    viewModel.requestExpand()
-                } else if configManager.config.general.hoverToPeek {
-                    viewModel.requestPeek()
-                }
-            }
 
         case .peek:
             PeekView(viewModel: viewModel, mediaManager: mediaManager)
@@ -132,12 +131,6 @@ struct NotchRootView: View {
                 .contentShape(Rectangle())
                 .onTapGesture {
                     viewModel.requestExpand()
-                }
-                .onHover { isHovering in
-                    guard isHovering else { return }
-                    if configManager.config.general.hoverToExpand {
-                        viewModel.requestExpand()
-                    }
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.state)
