@@ -54,9 +54,10 @@ struct NotchRootView: View {
         }
         // ESC to collapse
         .onKeyPress(.escape) {
-            viewModel.state = .collapsed
+            viewModel.requestCollapse()
             return .handled
         }
+        .animation(.spring(response: 0.36, dampingFraction: 0.82), value: viewModel.state)
     }
 
     // MARK: - Background shape
@@ -67,21 +68,12 @@ struct NotchRootView: View {
             state: viewModel.state
         )
         .fill(.black)
-        .frame(
-            width: viewModel.state == .collapsed ? viewModel.geometry.notchFrame.width : nil,
-            height: viewModel.state == .collapsed ? viewModel.geometry.notchFrame.height : nil,
-            alignment: .top
-        )
         .contentShape(Rectangle())
         .onTapGesture {
             if viewModel.state == .collapsed || viewModel.state == .peek {
                 viewModel.requestExpand()
             }
         }
-        .animation(
-            .spring(response: 0.35, dampingFraction: 0.75),
-            value: viewModel.state
-        )
         .ignoresSafeArea()
     }
 
@@ -91,39 +83,8 @@ struct NotchRootView: View {
     private var contentLayer: some View {
         switch viewModel.state {
         case .collapsed:
-            ZStack {
-                // Invisible solid hit target filling the entire panel frame
-                Color.black.opacity(0.001)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contentShape(Rectangle())
-
-                HStack(spacing: 6) {
-                    if TerminalManager.shared.hasRunningServers {
-                        collapsedServerStatusDot
-                            .transition(.opacity)
-                    }
-
-                    if let vpn = widgetRegistry.widget(id: "vpn-status") as? ActionWidget, vpn.status == .active {
-                        Image(systemName: "lock.shield.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.green)
-                            .transition(.opacity)
-                    }
-
-                    Spacer()
-
-                    if let media = mediaManager.currentMedia, media.isPlaying {
-                        collapsedMediaAccessory(media)
-                            .transition(.opacity)
-                    }
-                }
-                .padding(.horizontal, 12)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                viewModel.requestExpand()
-            }
+            collapsedView
+                .transition(.opacity)
 
         case .peek:
             PeekView(viewModel: viewModel, mediaManager: mediaManager)
@@ -132,8 +93,10 @@ struct NotchRootView: View {
                 .onTapGesture {
                     viewModel.requestExpand()
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.state)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top)),
+                    removal: .opacity
+                ))
 
         case .expanded:
             ExpandedView(
@@ -145,8 +108,46 @@ struct NotchRootView: View {
                 calendarManager: calendarManager,
                 widgetRegistry: widgetRegistry
             )
-            .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
-            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: viewModel.state)
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .top)),
+                removal: .opacity
+            ))
+        }
+    }
+
+    private var collapsedView: some View {
+        ZStack {
+            // Invisible solid hit target filling the entire panel frame
+            Color.black.opacity(0.001)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+
+            HStack(spacing: 6) {
+                if TerminalManager.shared.hasRunningServers {
+                    collapsedServerStatusDot
+                        .transition(.opacity)
+                }
+
+                if let vpn = widgetRegistry.actionWidget(id: "vpn-status"), vpn.status == .active {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.green)
+                        .transition(.opacity)
+                }
+
+                Spacer()
+
+                if let media = mediaManager.currentMedia, media.isPlaying {
+                    collapsedMediaAccessory(media)
+                        .transition(.opacity)
+                }
+            }
+            .padding(.horizontal, 12)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            viewModel.requestExpand()
         }
     }
 

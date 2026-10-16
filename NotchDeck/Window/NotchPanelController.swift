@@ -140,7 +140,9 @@ final class NotchPanelController: NSObject {
     func expand() {
         logger.debug("→ expanded")
         peekTimer?.cancel()
-        viewModel.state = .expanded
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
+            viewModel.state = .expanded
+        }
         resizePanel(for: .expanded, animated: true)
         // Panel must become key so text fields work
         panel.makeKeyAndOrderFront(nil)
@@ -149,7 +151,9 @@ final class NotchPanelController: NSObject {
     func collapse() {
         logger.debug("→ collapsed")
         peekTimer?.cancel()
-        viewModel.state = .collapsed
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
+            viewModel.state = .collapsed
+        }
         resizePanel(for: .collapsed, animated: true)
         // Return focus to whichever app was previously active
         if let app = NSWorkspace.shared.frontmostApplication {
@@ -160,7 +164,9 @@ final class NotchPanelController: NSObject {
     func peek() {
         guard viewModel.state == .collapsed else { return }
         logger.debug("→ peek")
-        viewModel.state = .peek
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+            viewModel.state = .peek
+        }
         resizePanel(for: .peek, animated: true)
     }
 
@@ -186,10 +192,10 @@ final class NotchPanelController: NSObject {
         let targetFrame = panelFrame(for: state)
 
         if animated {
-            // Use NSAnimationContext for the window frame — SwiftUI handles internal animation
+            let duration: TimeInterval = (state == .expanded) ? 0.36 : 0.32
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration          = 0.35
-                ctx.timingFunction    = CAMediaTimingFunction(name: .easeInEaseOut)
+                ctx.duration          = duration
+                ctx.timingFunction    = CAMediaTimingFunction(controlPoints: 0.16, 1.0, 0.3, 1.0)
                 ctx.allowsImplicitAnimation = true
                 panel.animator().setFrame(targetFrame, display: true)
             } completionHandler: { [weak self] in
