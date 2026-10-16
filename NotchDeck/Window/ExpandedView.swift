@@ -143,13 +143,29 @@ struct ExpandedView: View {
     @ViewBuilder
     private func renderTabButton(_ item: TabItemModel) -> some View {
         if let tab = item.builtInTab {
-            TabButton(
-                tab: tab,
-                isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == tab
-            ) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    viewModel.activeCustomTabId = nil
-                    viewModel.activeTab = tab
+            if tab == .vpn, let vpnWidget = (widgetRegistry.widget(id: "vpn-status") as? ActionWidget) ?? (widgetRegistry.widgets.first(where: { $0.id.contains("vpn") }) as? ActionWidget) {
+                VPNTopBarToggle(widget: vpnWidget, isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == .vpn) {
+                    // Single click = instant direct toggle without opening any card!
+                    if let toggleBtn = vpnWidget.config.buttons.first(where: { $0.label.lowercased().contains("toggle") }) {
+                        Task { await vpnWidget.executeButton(toggleBtn) }
+                    } else if let firstBtn = vpnWidget.config.buttons.first {
+                        Task { await vpnWidget.executeButton(firstBtn) }
+                    }
+                } onOpenTab: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        viewModel.activeCustomTabId = nil
+                        viewModel.activeTab = .vpn
+                    }
+                }
+            } else {
+                TabButton(
+                    tab: tab,
+                    isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == tab
+                ) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        viewModel.activeCustomTabId = nil
+                        viewModel.activeTab = tab
+                    }
                 }
             }
         } else {
@@ -277,6 +293,65 @@ private struct CustomTabButton: View {
         .onHover { hovering in
             isHovered = hovering
         }
+    }
+}
+
+private struct VPNTopBarToggle: View {
+    @ObservedObject var widget: ActionWidget
+    let isSelected: Bool
+    let onToggle: () -> Void
+    let onOpenTab: () -> Void
+
+    @State private var isHovered: Bool = false
+
+    private var isConnected: Bool {
+        widget.status == .active
+    }
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 5) {
+                if widget.isExecuting {
+                    ProgressView()
+                        .scaleEffect(0.55)
+                        .frame(width: 12, height: 12)
+                } else {
+                    Image(systemName: isConnected ? "lock.shield.fill" : "lock.shield")
+                        .font(.system(size: 11, weight: isConnected ? .semibold : .regular))
+                        .foregroundStyle(isConnected ? Color.green : (isHovered ? .white : .white.opacity(0.5)))
+                }
+
+                Text(isConnected ? "VPN On" : "VPN")
+                    .font(.system(size: 10, weight: isConnected ? .semibold : .medium))
+                    .foregroundStyle(isConnected ? Color.green : (isHovered ? .white.opacity(0.9) : .white.opacity(0.5)))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 7)
+            .frame(height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(
+                        isConnected
+                            ? Color.green.opacity(0.18)
+                            : (isHovered ? Color.white.opacity(0.08) : Color.clear)
+                    )
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .contextMenu {
+            Button("Toggle VPN") {
+                onToggle()
+            }
+            Button("Open VPN Details") {
+                onOpenTab()
+            }
+        }
+        .help(isConnected ? "VPN Connected (Click to disconnect)" : "VPN Disconnected (Click to connect)")
     }
 }
 

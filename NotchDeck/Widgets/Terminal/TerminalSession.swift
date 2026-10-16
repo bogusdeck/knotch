@@ -57,9 +57,15 @@ final class TerminalSession: NSObject, Identifiable, ObservableObject, LocalProc
             args.append(contentsOf: ["-c", command])
         }
 
-        let workingDir: String? = cwd.map { NSString(string: $0).expandingTildeInPath }
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
+        let workingDir: String = {
+            if let cwd = cwd, !cwd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return NSString(string: cwd).expandingTildeInPath
+            }
+            return homeDir
+        }()
 
-        logger.info("Starting terminal session '\(self.title)' (id: \(self.id)): \(shell) \(args) in \(workingDir ?? "home")")
+        logger.info("Starting terminal session '\(self.title)' (id: \(self.id)): \(shell) \(args) in \(workingDir)")
 
         terminalView.startProcess(
             executable: shell,
