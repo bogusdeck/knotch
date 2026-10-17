@@ -51,33 +51,37 @@ struct ExpandedView: View {
     }
 
     private var allTabItems: [TabItemModel] {
-        var items: [TabItemModel] = [
-            TabItemModel(id: "home", title: "Home", iconName: "square.grid.2x2", builtInTab: .home),
-            TabItemModel(id: "notes", title: "Notes", iconName: "note.text", builtInTab: .notes),
-            TabItemModel(id: "shelf", title: "Shelf", iconName: "tray.2", builtInTab: .shelf),
-            TabItemModel(id: "terminal", title: "Terminal", iconName: "terminal", builtInTab: .terminal),
-            TabItemModel(id: "vpn", title: "VPN", iconName: "lock.shield", builtInTab: .vpn)
-        ]
-
-        for widget in customTabs {
-            items.append(
-                TabItemModel(
-                    id: widget.id,
-                    title: widget.title,
-                    iconName: "square.dashed",
-                    builtInTab: nil
-                )
-            )
+        let configured = configManager.config.layout.tabs
+        var items: [TabItemModel] = []
+        for tabId in configured {
+            switch tabId {
+            case "home":
+                items.append(TabItemModel(id: "home", title: "Home", iconName: "square.grid.2x2", builtInTab: .home))
+            case "notes":
+                items.append(TabItemModel(id: "notes", title: "Notes", iconName: "note.text", builtInTab: .notes))
+            case "shelf":
+                items.append(TabItemModel(id: "shelf", title: "Shelf", iconName: "tray.2", builtInTab: .shelf))
+            case "terminal":
+                items.append(TabItemModel(id: "terminal", title: "Terminal", iconName: "terminal", builtInTab: .terminal))
+            case "vpn":
+                items.append(TabItemModel(id: "vpn", title: "VPN", iconName: "lock.shield", builtInTab: .vpn))
+            default:
+                if let widget = widgetRegistry.widget(id: tabId) {
+                    items.append(TabItemModel(id: widget.id, title: widget.title, iconName: "square.dashed", builtInTab: nil))
+                }
+            }
         }
         return items
     }
 
     private var leftTabs: [TabItemModel] {
-        Array(allTabItems.prefix(3))
+        let split = min(3, allTabItems.count)
+        return Array(allTabItems.prefix(split))
     }
 
     private var rightTabs: [TabItemModel] {
-        Array(allTabItems.dropFirst(3))
+        let split = min(3, allTabItems.count)
+        return Array(allTabItems.dropFirst(split))
     }
 
     private var notchCenterCutout: some View {
@@ -427,6 +431,10 @@ struct HomeDashboardView: View {
             ClockTile()
         case "calendar":
             CalendarWidgetTile(calendarManager: calendarManager)
+        case "vpn", "vpn-status":
+            if let vpn = widgetRegistry.actionWidget(id: "vpn-status") ?? widgetRegistry.allActionWidgets.first(where: { $0.id.contains("vpn") }) {
+                VPNView(widget: vpn)
+            }
         default:
             if let dynamicWidget = widgetRegistry.widget(id: widgetId) {
                 dynamicWidget.expandedView()
@@ -502,112 +510,158 @@ struct VPNView: View {
         widget.status == .active
     }
 
+    private var parsedIP: String? {
+        for line in widget.lastOutput.components(separatedBy: .newlines) {
+            if line.lowercased().contains("public ip:") {
+                let parts = line.components(separatedBy: ":")
+                if parts.count >= 2 {
+                    let ip = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !ip.isEmpty && !ip.contains("{") { return ip }
+                }
+            }
+        }
+        return nil
+    }
+
+    private var parsedFirewall: String? {
+        for line in widget.lastOutput.components(separatedBy: .newlines) {
+            if line.lowercased().contains("firewall") {
+                let parts = line.components(separatedBy: ":")
+                if parts.count >= 2 {
+                    let fw = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !fw.isEmpty && !fw.contains("{") { return fw }
+                }
+            }
+        }
+        return nil
+    }
+
     var body: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 28) {
             // Left: Status Shield
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 ZStack {
                     Circle()
                         .fill(isConnected ? Color.green.opacity(0.15) : Color.white.opacity(0.06))
-                        .frame(width: 64, height: 64)
+                        .frame(width: 68, height: 68)
 
                     Image(systemName: isConnected ? "lock.shield.fill" : "lock.shield")
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(isConnected ? Color.green : Color.white.opacity(0.5))
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundStyle(isConnected ? Color.green : Color.white.opacity(0.45))
                 }
 
-                Text(widget.status.label)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(isConnected ? Color.green : Color.white.opacity(0.6))
+                VStack(spacing: 2) {
+                    Text(isConnected ? "Connected" : (widget.status == .checking ? "Connecting…" : "Disconnected"))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(isConnected ? Color.green : (widget.status == .checking ? Color.orange : Color.white.opacity(0.6)))
+
+                    if isConnected {
+                        Text("Protected")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.green.opacity(0.8))
+                    } else {
+                        Text("Unprotected")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.35))
+                    }
+                }
             }
-            .frame(width: 110)
+            .frame(width: 120)
 
             Divider()
                 .overlay(Color.white.opacity(0.1))
-                .frame(height: 100)
+                .frame(height: 110)
 
             // Right: Info & Controls
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text(widget.title)
-                        .font(.system(size: 14, weight: .bold))
+                    Text("VPN")
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.white)
 
                     Spacer()
 
-                    // Refresh
+                    // Refresh button
                     Button {
                         Task { await widget.pollStatus() }
                     } label: {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .padding(6)
+                            .background(Circle().fill(Color.white.opacity(0.06)))
                     }
                     .buttonStyle(.plain)
                     .help("Refresh VPN status")
                 }
 
-                if !widget.lastOutput.isEmpty {
-                    Text(widget.lastOutput)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .lineLimit(4)
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.white.opacity(0.04))
-                        .cornerRadius(6)
+                // Info items (clean badge pills)
+                HStack(spacing: 10) {
+                    if let ip = parsedIP {
+                        HStack(spacing: 5) {
+                            Image(systemName: "network")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.5))
+                            Text(ip)
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.85))
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
+                    }
+
+                    if let fw = parsedFirewall {
+                        HStack(spacing: 5) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(fw.lowercased() == "on" ? Color.orange : Color.white.opacity(0.4))
+                            Text("Firewall: \(fw)")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.75))
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
+                    }
                 }
 
-                // Action buttons
-                if !widget.config.buttons.isEmpty {
-                    HStack(spacing: 10) {
-                        ForEach(widget.config.buttons, id: \.label) { button in
-                            Button {
-                                Task { await widget.executeButton(button) }
-                            } label: {
-                                HStack(spacing: 5) {
-                                    if button.label.lowercased().contains("toggle") {
-                                        Image(systemName: "power")
-                                    } else if button.label.lowercased().contains("connect") && !button.label.lowercased().contains("dis") {
-                                        Image(systemName: "bolt.fill")
-                                    } else if button.label.lowercased().contains("disconnect") {
-                                        Image(systemName: "stop.fill")
-                                    }
-                                    Text(button.label)
-                                        .fontWeight(.medium)
-                                }
-                                .font(.system(size: 11))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(buttonColor(for: button.label))
-                                .foregroundStyle(.white)
-                                .cornerRadius(7)
+                // Primary Action Button
+                HStack(spacing: 12) {
+                    Button {
+                        if let toggleBtn = widget.config.buttons.first(where: { $0.label.lowercased().contains("toggle") }) {
+                            Task { await widget.executeButton(toggleBtn) }
+                        } else if isConnected, let disBtn = widget.config.buttons.first(where: { $0.label.lowercased().contains("dis") }) {
+                            Task { await widget.executeButton(disBtn) }
+                        } else if let connBtn = widget.config.buttons.first(where: { $0.label.lowercased().contains("connect") }) {
+                            Task { await widget.executeButton(connBtn) }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if widget.isExecuting {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                    .frame(width: 14, height: 14)
+                            } else {
+                                Image(systemName: isConnected ? "stop.fill" : "bolt.fill")
+                                    .font(.system(size: 11))
                             }
-                            .buttonStyle(.plain)
-                            .disabled(widget.isExecuting)
-                        }
 
-                        if widget.isExecuting {
-                            ProgressView()
-                                .scaleEffect(0.6)
+                            Text(isConnected ? "Disconnect" : "Connect VPN")
+                                .font(.system(size: 12, weight: .semibold))
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(isConnected ? Color.red.opacity(0.8) : Color.green.opacity(0.85))
+                        .foregroundStyle(.white)
+                        .cornerRadius(8)
                     }
+                    .buttonStyle(.plain)
+                    .disabled(widget.isExecuting)
                 }
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func buttonColor(for label: String) -> Color {
-        let lower = label.lowercased()
-        if lower.contains("toggle") {
-            return isConnected ? Color.red.opacity(0.8) : Color.green.opacity(0.8)
-        } else if lower.contains("connect") && !lower.contains("dis") {
-            return Color.green.opacity(0.7)
-        } else if lower.contains("disconnect") {
-            return Color.red.opacity(0.7)
-        }
-        return Color.white.opacity(0.15)
     }
 }
