@@ -2,6 +2,7 @@
 // Full dashboard shown in the expanded state.
 // Uses a tab bar along the top to switch between widget panels.
 
+import IOKit.ps
 import SwiftUI
 
 struct ExpandedView: View {
@@ -411,15 +412,39 @@ struct HomeDashboardView: View {
     @ObservedObject var calendarManager: CalendarManager
     @ObservedObject var widgetRegistry: WidgetRegistry
 
+    private var leftWidgetIds: [String] {
+        let items = configManager.config.layout.home.filter { $0 != "clock" }
+        return items.isEmpty ? ["media", "calendar"] : items
+    }
+
+    private var showClockOnRight: Bool {
+        configManager.config.layout.home.contains("clock")
+    }
+
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 10) {
-                ForEach(configManager.config.layout.home, id: \.self) { widgetId in
-                    homeTile(for: widgetId)
+        HStack(alignment: .top, spacing: 14) {
+            // Left Column: Media Player, Calendar, other cards
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 12) {
+                    ForEach(leftWidgetIds, id: \.self) { widgetId in
+                        homeTile(for: widgetId)
+                    }
                 }
+                .padding(.vertical, 2)
             }
-            .padding(14)
+            .frame(maxWidth: .infinity)
+
+            // Right Column: Clock & Time card
+            if showClockOnRight {
+                VStack(spacing: 12) {
+                    ClockTile(calendarManager: calendarManager)
+                    Spacer(minLength: 0)
+                }
+                .frame(width: 220)
+            }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -428,7 +453,7 @@ struct HomeDashboardView: View {
         case "media":
             MediaView(mediaManager: mediaManager)
         case "clock":
-            ClockTile()
+            ClockTile(calendarManager: calendarManager)
         case "calendar":
             CalendarWidgetTile(calendarManager: calendarManager)
         case "vpn", "vpn-status":
@@ -446,26 +471,146 @@ struct HomeDashboardView: View {
 // MARK: - Clock Tile
 
 struct ClockTile: View {
+    @ObservedObject var calendarManager: CalendarManager
+
     var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(Date(), format: .dateTime.hour().minute().second())
-                    .font(.system(size: 24, weight: .light, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide).year())
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.5))
+        TimelineView(.periodic(from: .now, by: 1.0)) { timeline in
+            let now = timeline.date
+            let battery = getBatteryInfo()
+
+            VStack(alignment: .leading, spacing: 10) {
+                // Top row: Greeting and Battery Status
+                HStack(alignment: .center) {
+                    HStack(spacing: 5) {
+                        Image(systemName: greetingIcon(for: now))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.yellow.opacity(0.9))
+
+                        Text(greeting(for: now))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.65))
+                    }
+
+                    Spacer()
+
+                    if let b = battery {
+                        HStack(spacing: 4) {
+                            Image(systemName: b.isCharging ? "bolt.batteryblock.fill" : batteryIcon(for: b.level))
+                                .font(.system(size: 10))
+                                .foregroundStyle(b.isCharging ? Color.green : (b.level <= 20 ? Color.red : Color.white.opacity(0.6)))
+
+                            Text("\(b.level)%")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.75))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2.5)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
+                    }
+                }
+
+                // Digital Clock Display (Live Seconds)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(now, format: .dateTime.hour().minute().second())
+                        .font(.system(size: 26, weight: .light, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+
+                    Text(now, format: .dateTime.weekday(.wide).day().month(.abbreviated).year())
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
+
+                Divider()
+                    .overlay(Color.white.opacity(0.08))
+
+                // Schedule snapshot: next event or calendar indicator
+                if let nextEvent = calendarManager.events.first {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(Color.red.opacity(0.85))
+                                .frame(width: 5, height: 5)
+
+                            Text("Upcoming")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.45))
+                                .textCase(.uppercase)
+                        }
+
+                        Text(nextEvent.title)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+
+                        Text(nextEvent.timeString)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.35))
+
+                        Text("No upcoming events")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                    .padding(.vertical, 2)
+                }
             }
-            Spacer()
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
         }
-        .padding(12)
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+    }
+
+    private func greeting(for date: Date) -> String {
+        let hour = Calendar.current.component(.hour, from: date)
+        switch hour {
+        case 5..<12:  return "Good Morning"
+        case 12..<17: return "Good Afternoon"
+        case 17..<22: return "Good Evening"
+        default:      return "Good Night"
+        }
+    }
+
+    private func greetingIcon(for date: Date) -> String {
+        let hour = Calendar.current.component(.hour, from: date)
+        switch hour {
+        case 5..<12:  return "sun.horizon.fill"
+        case 12..<17: return "sun.max.fill"
+        case 17..<22: return "sunset.fill"
+        default:      return "moon.stars.fill"
+        }
+    }
+
+    private func batteryIcon(for level: Int) -> String {
+        switch level {
+        case 0..<20:   return "battery.25"
+        case 20..<50:  return "battery.50"
+        case 50..<80:  return "battery.75"
+        default:       return "battery.100"
+        }
+    }
+
+    private func getBatteryInfo() -> (level: Int, isCharging: Bool)? {
+        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() else { return nil }
+        guard let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef], !sources.isEmpty else { return nil }
+        for s in sources {
+            guard let desc = IOPSGetPowerSourceDescription(snapshot, s)?.takeUnretainedValue() as? [String: Any] else { continue }
+            if let cap = desc[kIOPSCurrentCapacityKey as String] as? Int {
+                let charging = (desc[kIOPSIsChargingKey as String] as? Bool) ?? false
+                return (cap, charging)
+            }
+        }
+        return nil
     }
 }
 
