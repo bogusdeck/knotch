@@ -5,7 +5,7 @@
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)](https://www.apple.com/macos/sonoma/)
 [![Swift 6](https://img.shields.io/badge/Swift-6.0-orange)](https://swift.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Build](https://github.com/notchdeck/notchdeck/actions/workflows/build.yml/badge.svg)](https://github.com/notchdeck/notchdeck/actions)
+[![Build](https://gitlab.com/notchdeck/notchdeck/actions/workflows/build.yml/badge.svg)](https://gitlab.com/notchdeck/notchdeck/actions)
 
 NotchDeck turns the MacBook notch into a live productivity hub: quick notes, a file shelf, now-playing media info, embedded terminal sessions, shell-command widgets, and user-crafted web widgets — all driven by a single `~/.config/notchdeck/config.toml` file.
 
@@ -31,7 +31,7 @@ NotchDeck turns the MacBook notch into a live productivity hub: quick notes, a f
 
 ```bash
 # 1. Clone
-git clone https://github.com/notchdeck/notchdeck.git
+git clone https://gitlab.com/notchdeck/notchdeck.git
 cd notchdeck/NotchDeck
 
 # 2. Generate the Xcode project
@@ -45,10 +45,10 @@ open NotchDeck.xcodeproj
 
 | Package | Purpose |
 |---------|---------|
-| [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) | Global hotkeys |
-| [TOMLKit](https://github.com/LebJe/TOMLKit) | Config file parsing |
-| [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) | Embedded terminal |
-| [Sparkle](https://github.com/sparkle-project/Sparkle) | Auto-updates |
+| [KeyboardShortcuts](https://gitlab.com/sindresorhus/KeyboardShortcuts) | Global hotkeys |
+| [TOMLKit](https://gitlab.com/LebJe/TOMLKit) | Config file parsing |
+| [SwiftTerm](https://gitlab.com/migueldeicaza/SwiftTerm) | Embedded terminal |
+| [Sparkle](https://gitlab.com/sparkle-project/Sparkle) | Auto-updates |
 
 ---
 

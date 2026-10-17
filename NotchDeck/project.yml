@@ -24,16 +24,16 @@ settings:
 
 packages:
   KeyboardShortcuts:
-    url: https://github.com/sindresorhus/KeyboardShortcuts
+    url: https://gitlab.com/sindresorhus/KeyboardShortcuts
     from: "2.2.2"
   TOMLKit:
-    url: https://github.com/LebJe/TOMLKit
+    url: https://gitlab.com/LebJe/TOMLKit
     from: "0.5.5"
   SwiftTerm:
-    url: https://github.com/migueldeicaza/SwiftTerm
+    url: https://gitlab.com/migueldeicaza/SwiftTerm
     from: "1.2.6"
   Sparkle:
-    url: https://github.com/sparkle-project/Sparkle
+    url: https://gitlab.com/sparkle-project/Sparkle
     from: "2.6.4"
 
 targets:
