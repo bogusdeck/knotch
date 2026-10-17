@@ -2,6 +2,7 @@
 // Implements the action widget: polls status command, regex-matches state, and runs action buttons.
 
 import AppKit
+import ApplicationServices
 import Combine
 import SwiftUI
 
@@ -100,6 +101,9 @@ final class ActionWidget: ObservableObject, NotchWidget {
             } else {
                 self.status = (result.exitCode == 0) ? .active : .inactive
             }
+            if self.status == .active {
+                self.suppressWindscribeWindowOnce()
+            }
         } catch {
             self.status = .error(error.localizedDescription)
             self.lastOutput = error.localizedDescription
@@ -113,6 +117,9 @@ final class ActionWidget: ObservableObject, NotchWidget {
         isExecuting = true
         defer { isExecuting = false }
 
+        // Start suppressing external VPN window immediately before command runs
+        suppressExternalVPNWindows()
+
         if let cmd = button.command, !cmd.isEmpty {
             _ = try? await CommandRunner.run(cmd, timeout: 15.0)
         } else if let script = button.applescript, !script.isEmpty {
@@ -124,6 +131,47 @@ final class ActionWidget: ObservableObject, NotchWidget {
         // Brief delay for system state to update, then poll immediately
         try? await Task.sleep(nanoseconds: 500_000_000)
         await pollStatus()
+        suppressWindscribeWindowOnce()
+    }
+
+    // MARK: - External Window Suppression
+
+    var isVPNWidget: Bool {
+        id.lowercased().contains("vpn") ||
+        title.lowercased().contains("vpn") ||
+        (config.statusCommand?.lowercased().contains("windscribe") == true)
+    }
+
+    func suppressExternalVPNWindows() {
+        guard isVPNWidget else { return }
+        Task { [weak self] in
+            for _ in 0..<20 {
+                guard !Task.isCancelled else { return }
+                self?.suppressWindscribeWindowOnce()
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+        }
+    }
+
+    func suppressWindscribeWindowOnce() {
+        guard isVPNWidget else { return }
+        let apps = NSWorkspace.shared.runningApplications.filter {
+            $0.bundleIdentifier == "com.windscribe.client" || $0.localizedName == "Windscribe"
+        }
+        for app in apps {
+            let axApp = AXUIElementCreateApplication(app.processIdentifier)
+            var windowsRef: AnyObject?
+            AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef)
+            if let windows = windowsRef as? [AXUIElement] {
+                for win in windows {
+                    _ = AXUIElementSetAttributeValue(win, kAXMinimizedAttribute as CFString, kCFBooleanTrue)
+                    var pos = CGPoint(x: -5000, y: -5000)
+                    if let posVal = AXValueCreate(.cgPoint, &pos) {
+                        _ = AXUIElementSetAttributeValue(win, kAXPositionAttribute as CFString, posVal)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - NotchWidget Conformance

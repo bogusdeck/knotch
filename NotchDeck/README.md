@@ -45,10 +45,10 @@ open NotchDeck.xcodeproj
 
 | Package | Purpose |
 |---------|---------|
-| [KeyboardShortcuts](https://gitlab.com/sindresorhus/KeyboardShortcuts) | Global hotkeys |
-| [TOMLKit](https://gitlab.com/LebJe/TOMLKit) | Config file parsing |
-| [SwiftTerm](https://gitlab.com/migueldeicaza/SwiftTerm) | Embedded terminal |
-| [Sparkle](https://gitlab.com/sparkle-project/Sparkle) | Auto-updates |
+| [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) | Global hotkeys |
+| [TOMLKit](https://github.com/LebJe/TOMLKit) | Config file parsing |
+| [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) | Embedded terminal |
+| [Sparkle](https://github.com/sparkle-project/Sparkle) | Auto-updates |
 
 ---
 
