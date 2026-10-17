@@ -30,6 +30,15 @@ struct ExpandedView: View {
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onExitCommand {
+            if viewModel.isSettingsActive {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.isSettingsActive = false
+                }
+            } else {
+                viewModel.requestCollapse()
+            }
+        }
     }
 
     // MARK: - Tab bar
@@ -114,10 +123,26 @@ struct ExpandedView: View {
         .help("Click notch to close")
     }
 
+    @ViewBuilder
     private var tabBar: some View {
+        if viewModel.isSettingsActive {
+            settingsTabBar
+        } else {
+            normalTabBar
+        }
+    }
+
+    private var normalTabBar: some View {
         HStack(spacing: 0) {
-            // Left tabs (3 tabs: Home, Notes, Shelf)
-            HStack(spacing: 4) {
+            // Left top corner: Settings button on the leftmost side + Left tabs (Home, Notes, Shelf)
+            HStack(spacing: 5) {
+                SettingsButton {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.isSettingsActive = true
+                    }
+                }
+                .padding(.trailing, 2)
+
                 ForEach(leftTabs) { item in
                     renderTabButton(item)
                 }
@@ -127,22 +152,65 @@ struct ExpandedView: View {
             // Center Notch cutout — matches hardware notch, clicking closes!
             notchCenterCutout
 
-            // Right tabs (Terminal, VPN, etc.) + Close Button
+            // Right tabs (Terminal, VPN, etc.)
             HStack(spacing: 4) {
                 ForEach(rightTabs) { item in
                     renderTabButton(item)
                 }
-
-                // Close / collapse button
-                TabCloseButton {
-                    viewModel.requestCollapse()
-                }
-                .padding(.leading, 3)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 8)
         .frame(height: max(viewModel.geometry.notchFrame.height, 30))
+    }
+
+    private var settingsTabBar: some View {
+        HStack(spacing: 0) {
+            // Left top corner: Back button + Left settings category tabs
+            HStack(spacing: 5) {
+                SettingsBackButton {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.isSettingsActive = false
+                    }
+                }
+                .padding(.trailing, 2)
+
+                ForEach(leftSettingsCategories) { category in
+                    settingsCategoryTabButton(category)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Center Notch cutout — matches hardware notch, clicking closes!
+            notchCenterCutout
+
+            // Right side: Right settings category tabs
+            HStack(spacing: 4) {
+                ForEach(rightSettingsCategories) { category in
+                    settingsCategoryTabButton(category)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(.horizontal, 8)
+        .frame(height: max(viewModel.geometry.notchFrame.height, 30))
+    }
+
+    private var leftSettingsCategories: [SettingsCategory] {
+        [.general, .appearance]
+    }
+
+    private var rightSettingsCategories: [SettingsCategory] {
+        [.shortcuts, .layout, .configSource]
+    }
+
+    private func settingsCategoryTabButton(_ category: SettingsCategory) -> some View {
+        let isSelected = viewModel.selectedSettingsCategory == category
+        return SettingsCategoryTabButton(category: category, isSelected: isSelected) {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                viewModel.selectedSettingsCategory = category
+            }
+        }
     }
 
     @ViewBuilder
@@ -187,7 +255,12 @@ struct ExpandedView: View {
 
     @ViewBuilder
     private var tabContent: some View {
-        if let customId = viewModel.activeCustomTabId, let widget = widgetRegistry.widget(id: customId) {
+        if viewModel.isSettingsActive {
+            NotchSettingsContentView(
+                configManager: configManager,
+                selectedCategory: $viewModel.selectedSettingsCategory
+            )
+        } else if let customId = viewModel.activeCustomTabId, let widget = widgetRegistry.widget(id: customId) {
             widget.expandedView()
                 .padding(10)
         } else {
@@ -230,31 +303,26 @@ private struct TabButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: tab.iconName)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                Text(tab.displayName)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.9) : .white.opacity(0.5)))
-            .padding(.horizontal, 7)
-            .frame(height: 22)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(
-                        isSelected
-                            ? Color.white.opacity(0.14)
-                            : (isHovered ? Color.white.opacity(0.07) : Color.clear)
-                    )
-            )
-            .contentShape(Rectangle())
+            Image(systemName: tab.iconName)
+                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.95) : .white.opacity(0.5)))
+                .frame(width: 28, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(
+                            isSelected
+                                ? Color.white.opacity(0.18)
+                                : (isHovered ? Color.white.opacity(0.08) : Color.clear)
+                        )
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovered = hovering
         }
+        .help(tab.displayName)
     }
 }
 
@@ -268,31 +336,26 @@ private struct CustomTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: "square.dashed")
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                Text(title)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.9) : .white.opacity(0.5)))
-            .padding(.horizontal, 7)
-            .frame(height: 22)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(
-                        isSelected
-                            ? Color.white.opacity(0.14)
-                            : (isHovered ? Color.white.opacity(0.07) : Color.clear)
-                    )
-            )
-            .contentShape(Rectangle())
+            Image(systemName: "square.dashed")
+                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.95) : .white.opacity(0.5)))
+                .frame(width: 28, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(
+                            isSelected
+                                ? Color.white.opacity(0.18)
+                                : (isHovered ? Color.white.opacity(0.08) : Color.clear)
+                        )
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovered = hovering
         }
+        .help(title)
     }
 }
 
@@ -310,26 +373,20 @@ private struct VPNTopBarToggle: View {
 
     var body: some View {
         Button(action: onToggle) {
-            HStack(spacing: 5) {
+            ZStack {
                 if widget.isExecuting {
                     ProgressView()
                         .scaleEffect(0.55)
-                        .frame(width: 12, height: 12)
+                        .frame(width: 14, height: 14)
                 } else {
                     Image(systemName: isConnected ? "lock.shield.fill" : "lock.shield")
-                        .font(.system(size: 11, weight: isConnected ? .semibold : .regular))
+                        .font(.system(size: 12, weight: isConnected ? .semibold : .regular))
                         .foregroundStyle(isConnected ? Color.green : (isHovered ? .white : .white.opacity(0.5)))
                 }
-
-                Text(isConnected ? "VPN On" : "VPN")
-                    .font(.system(size: 10, weight: isConnected ? .semibold : .medium))
-                    .foregroundStyle(isConnected ? Color.green : (isHovered ? .white.opacity(0.9) : .white.opacity(0.5)))
-                    .lineLimit(1)
             }
-            .padding(.horizontal, 7)
-            .frame(height: 22)
+            .frame(width: 28, height: 26)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 7)
                     .fill(
                         isConnected
                             ? Color.green.opacity(0.18)
@@ -343,6 +400,7 @@ private struct VPNTopBarToggle: View {
         .onHover { hovering in
             isHovered = hovering
         }
+        .help(isConnected ? "VPN Connected (Click to disconnect)" : "VPN Disconnected (Click to connect)")
         .contextMenu {
             Button("Toggle VPN") {
                 onToggle()
@@ -351,32 +409,87 @@ private struct VPNTopBarToggle: View {
                 onOpenTab()
             }
         }
-        .help(isConnected ? "VPN Connected (Click to disconnect)" : "VPN Disconnected (Click to connect)")
     }
 }
 
-private struct TabCloseButton: View {
+private struct SettingsButton: View {
     let action: () -> Void
     @State private var isHovered: Bool = false
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 13))
-                .foregroundStyle(isHovered ? .white.opacity(0.9) : .white.opacity(0.45))
-                .frame(width: 22, height: 22)
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isHovered ? .white : .white.opacity(0.65))
+                .frame(width: 28, height: 26)
                 .background(
-                    Circle()
-                        .fill(isHovered ? Color.white.opacity(0.1) : Color.clear)
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(isHovered ? Color.white.opacity(0.16) : Color.white.opacity(0.06))
                 )
-                .contentShape(Circle())
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .contentShape(Circle())
+        .contentShape(Rectangle())
         .onHover { hovering in
             isHovered = hovering
         }
-        .help("Close notch")
+        .help("Settings (⌘,)")
+    }
+}
+
+private struct SettingsBackButton: View {
+    let action: () -> Void
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(isHovered ? .white : .white.opacity(0.85))
+                .frame(width: 28, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(isHovered ? Color.white.opacity(0.18) : Color.white.opacity(0.08))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .help("Back to Dashboard (Esc)")
+    }
+}
+
+private struct SettingsCategoryTabButton: View {
+    let category: SettingsCategory
+    let isSelected: Bool
+    let action: () -> Void
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: category.iconName)
+                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.95) : .white.opacity(0.5)))
+                .frame(width: 28, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(
+                            isSelected
+                                ? Color.white.opacity(0.18)
+                                : (isHovered ? Color.white.opacity(0.08) : Color.clear)
+                        )
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .help(category.title)
     }
 }
 

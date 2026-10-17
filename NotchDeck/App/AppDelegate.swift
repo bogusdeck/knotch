@@ -138,11 +138,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UpdaterManager.shared.checkForUpdates()
     }
 
-    @objc private func openSettings() {
-        if let controller = settingsWindowController {
-            controller.showWindow(nil)
-            controller.window?.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+    @objc func openSettings() {
+        if let panelController {
+            panelController.openSettings()
             return
         }
 

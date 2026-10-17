@@ -20,6 +20,10 @@ final class NotchViewModel: ObservableObject {
     @Published var activeTab: NotchTab = .home
     @Published var activeCustomTabId: String? = nil
 
+    /// In-notch settings mode state
+    @Published var isSettingsActive: Bool = false
+    @Published var selectedSettingsCategory: SettingsCategory = .general
+
     /// Non-nil when config.toml has a parse or I/O error
     @Published var configError: ConfigError? = nil
 
@@ -47,6 +51,18 @@ final class NotchViewModel: ObservableObject {
 
     func requestPeek() {
         onPeekRequested?()
+    }
+
+    func openSettingsInsideNotch(category: SettingsCategory = .general) {
+        selectedSettingsCategory = category
+        isSettingsActive = true
+        if state != .expanded {
+            requestExpand()
+        }
+    }
+
+    func closeSettingsInsideNotch() {
+        isSettingsActive = false
     }
 
     // MARK: - Init

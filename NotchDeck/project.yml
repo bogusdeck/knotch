@@ -76,6 +76,7 @@ targets:
       - path: Tests
     settings:
       base:
+        GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.notchdeck.tests
         PRODUCT_NAME: NotchDeckTests
     dependencies:

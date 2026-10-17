@@ -16,7 +16,7 @@ final class NotchPanelController: NSObject {
 
     private let panel: NotchPanel
     private var hostingView: NSHostingView<NotchRootView>?
-    private let viewModel: NotchViewModel
+    let viewModel: NotchViewModel
     private let configManager: ConfigManager
     private var geometry: NotchGeometry
 
@@ -148,11 +148,18 @@ final class NotchPanelController: NSObject {
         panel.makeKeyAndOrderFront(nil)
     }
 
+    func openSettings(category: SettingsCategory = .general) {
+        expand()
+        viewModel.openSettingsInsideNotch(category: category)
+    }
+
     func collapse() {
         logger.debug("→ collapsed")
         peekTimer?.cancel()
+        TerminalZoomModalController.shared.dismiss()
         withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
             viewModel.state = .collapsed
+            viewModel.isSettingsActive = false
         }
         resizePanel(for: .collapsed, animated: true)
         // Return focus to whichever app was previously active
