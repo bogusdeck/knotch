@@ -211,15 +211,7 @@ final class NotchPanelController: NSObject {
         let cfg = configManager.config.appearance
         switch state {
         case .collapsed:
-            let base = geometry.notchFrame
-            let padX: CGFloat = 16
-            let padBottom: CGFloat = 8
-            return CGRect(
-                x: base.minX - padX,
-                y: base.minY - padBottom,
-                width: base.width + (padX * 2),
-                height: base.height + padBottom
-            )
+            return geometry.notchFrame
 
         case .peek:
             let w = geometry.notchFrame.width + 80
