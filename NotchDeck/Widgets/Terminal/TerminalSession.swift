@@ -37,7 +37,7 @@ final class TerminalSession: NSObject, Identifiable, ObservableObject, LocalProc
         self.cwd = cwd
         self.isServer = isServer
 
-        let view = LocalProcessTerminalView(frame: .zero)
+        let view = LocalProcessTerminalView(frame: CGRect(x: 0, y: 0, width: 800, height: 480))
         view.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
         self.terminalView = view
 
@@ -65,12 +65,28 @@ final class TerminalSession: NSObject, Identifiable, ObservableObject, LocalProc
             return homeDir
         }()
 
+        var env = ProcessInfo.processInfo.environment
+        env["TERM"] = "xterm-256color"
+        env["COLORTERM"] = "truecolor"
+        env["LANG"] = "en_US.UTF-8"
+        if let currentPath = env["PATH"] {
+            let standardPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+            var parts = currentPath.split(separator: ":").map(String.init)
+            for p in standardPaths where !parts.contains(p) {
+                parts.append(p)
+            }
+            env["PATH"] = parts.joined(separator: ":")
+        } else {
+            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        }
+        let envList = env.map { "\($0.key)=\($0.value)" }
+
         logger.info("Starting terminal session '\(self.title)' (id: \(self.id)): \(shell) \(args) in \(workingDir)")
 
         terminalView.startProcess(
             executable: shell,
             args: args,
-            environment: nil,
+            environment: envList,
             currentDirectory: workingDir
         )
 

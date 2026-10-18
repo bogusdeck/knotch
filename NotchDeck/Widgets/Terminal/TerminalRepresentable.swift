@@ -9,40 +9,61 @@ import SwiftTerm
 final class TerminalContainerView: NSView {
     private(set) var currentTerminalView: LocalProcessTerminalView?
 
+    override var isFlipped: Bool { true }
+
     func setTerminalView(_ newView: LocalProcessTerminalView) {
         if currentTerminalView !== newView || newView.superview !== self {
             currentTerminalView?.removeFromSuperview()
             currentTerminalView = newView
 
-            newView.wantsLayer = true
-            newView.layer?.backgroundColor = NSColor.clear.cgColor
+            newView.translatesAutoresizingMaskIntoConstraints = true
+            newView.autoresizingMask = [.width, .height]
             addSubview(newView)
         }
 
-        // Only resize terminal when bounds are realistic (prevents SIGWINCH corruption during collapse)
-        if bounds.width >= 160 && bounds.height >= 60 {
-            newView.frame = bounds
-        }
+        updateTerminalLayout()
+    }
 
-        newView.needsDisplay = true
-        newView.needsLayout = true
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        updateTerminalLayout()
+    }
 
-        DispatchQueue.main.async { [weak self, weak newView] in
-            guard let self = self, let newView = newView else { return }
-            if self.bounds.width >= 160 && self.bounds.height >= 60 {
-                newView.frame = self.bounds
-            }
-            self.window?.makeFirstResponder(newView)
-            newView.needsDisplay = true
-        }
+    override func resizeSubviews(withOldSize oldSize: NSSize) {
+        super.resizeSubviews(withOldSize: oldSize)
+        updateTerminalLayout()
     }
 
     override func layout() {
         super.layout()
-        // Never crush terminal columns/rows during notch collapse animation
+        updateTerminalLayout()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil {
+            updateTerminalLayout()
+            focusTerminal()
+        }
+    }
+
+    private func updateTerminalLayout() {
+        guard let terminal = currentTerminalView else { return }
+        // Keep frame intact if bounds collapse below threshold (prevents SIGWINCH buffer crushing during notch spring animation)
         if bounds.width >= 160 && bounds.height >= 60 {
-            currentTerminalView?.frame = bounds
-            currentTerminalView?.needsDisplay = true
+            if terminal.frame != bounds {
+                terminal.frame = bounds
+                terminal.needsDisplay = true
+            }
+        }
+    }
+
+    func focusTerminal() {
+        guard let terminal = currentTerminalView, let window = self.window else { return }
+        DispatchQueue.main.async { [weak terminal, weak window] in
+            guard let terminal = terminal, let window = window else { return }
+            window.makeFirstResponder(terminal)
+            terminal.needsDisplay = true
         }
     }
 }

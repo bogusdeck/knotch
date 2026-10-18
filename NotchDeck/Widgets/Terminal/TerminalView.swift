@@ -42,7 +42,7 @@ struct TerminalView: View {
                     TerminalRepresentable(terminalView: active.terminalView)
                         .id(active.id)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .layoutPriority(1)
                         .padding(8)
                 }
             } else {
@@ -359,6 +359,7 @@ struct TerminalZoomModalView: View {
                     TerminalRepresentable(terminalView: session.terminalView)
                         .id("zoom_\(session.id)")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .layoutPriority(1)
                         .padding(10)
                 }
                 .frame(width: cardWidth, height: cardHeight)

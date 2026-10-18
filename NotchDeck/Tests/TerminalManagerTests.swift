@@ -61,4 +61,13 @@ final class TerminalManagerTests: XCTestCase {
         manager.closeSession(id: "default")
         XCTAssertTrue(manager.sessions.contains { $0.id == "default" })
     }
+
+    func testTerminalContainerResizesTerminalView() {
+        let session = TerminalSession(id: "test", title: "Test")
+        let container = TerminalContainerView()
+        container.setTerminalView(session.terminalView)
+        container.frame = NSRect(x: 0, y: 0, width: 800, height: 600)
+        XCTAssertEqual(session.terminalView.frame.size.width, 800)
+        XCTAssertEqual(session.terminalView.frame.size.height, 600)
+    }
 }
