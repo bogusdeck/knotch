@@ -2,6 +2,7 @@
 // Full dashboard shown in the expanded state.
 // Uses a tab bar along the top to switch between widget panels.
 
+import Darwin
 import IOKit.ps
 import SwiftUI
 
@@ -17,6 +18,7 @@ struct ExpandedView: View {
     @ObservedObject var widgetRegistry: WidgetRegistry
 
     @State private var isNotchHovered: Bool = false
+    @State private var isExpandedDropTargeted: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,6 +33,17 @@ struct ExpandedView: View {
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onDrop(of: DropURLHelper.supportedDropTypes, isTargeted: $isExpandedDropTargeted) { providers in
+            DropURLHelper.extractURLs(from: providers) { urls in
+                for url in urls {
+                    holderManager.addItem(from: url)
+                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    viewModel.activeTab = .holder
+                }
+            }
+            return true
+        }
         .onExitCommand {
             if viewModel.isSettingsActive {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -530,13 +543,31 @@ struct HomeDashboardView: View {
     @ObservedObject var calendarManager: CalendarManager
     @ObservedObject var widgetRegistry: WidgetRegistry
 
-    private var leftWidgetIds: [String] {
-        let items = configManager.config.layout.home.filter { $0 != "clock" }
-        return items.isEmpty ? ["media", "calendar"] : items
+    private var isRAMWidgetEnabled: Bool {
+        configManager.config.layout.home.contains("ram") ||
+        configManager.config.layout.home.contains("memory") ||
+        configManager.config.layout.home.contains("ram-status")
     }
 
-    private var showClockOnRight: Bool {
+    private var isClockWidgetEnabled: Bool {
         configManager.config.layout.home.contains("clock")
+    }
+
+    private var rightWidget: String? {
+        if isRAMWidgetEnabled {
+            return "ram"
+        }
+        if isClockWidgetEnabled {
+            return "clock"
+        }
+        return nil
+    }
+
+    private var leftWidgetIds: [String] {
+        let items = configManager.config.layout.home.filter {
+            $0 != "clock" && $0 != "ram" && $0 != "memory" && $0 != "ram-status"
+        }
+        return items.isEmpty ? ["media"] : items
     }
 
     var body: some View {
@@ -552,10 +583,14 @@ struct HomeDashboardView: View {
             }
             .frame(maxWidth: .infinity)
 
-            // Right Column: Clock & Time card
-            if showClockOnRight {
+            // Right Column: RAM / Memory Status card OR Clock & Time card
+            if let right = rightWidget {
                 VStack(spacing: 12) {
-                    ClockTile(calendarManager: calendarManager)
+                    if right == "ram" {
+                        RAMStatusTile()
+                    } else {
+                        ClockTile(calendarManager: calendarManager)
+                    }
                     Spacer(minLength: 0)
                 }
                 .frame(width: 220)
@@ -570,6 +605,8 @@ struct HomeDashboardView: View {
         switch widgetId {
         case "media":
             MediaView(mediaManager: mediaManager)
+        case "ram", "memory", "ram-status":
+            RAMStatusTile()
         case "clock":
             ClockTile(calendarManager: calendarManager)
         case "calendar":
@@ -582,6 +619,256 @@ struct HomeDashboardView: View {
             if let dynamicWidget = widgetRegistry.widget(id: widgetId) {
                 dynamicWidget.expandedView()
             }
+        }
+    }
+}
+
+// MARK: - System Memory Info & Stats
+
+struct SystemMemoryInfo: Sendable {
+    let totalBytes: UInt64
+    let usedBytes: UInt64
+    let freeBytes: UInt64
+    let appBytes: UInt64
+    let wiredBytes: UInt64
+    let compressedBytes: UInt64
+
+    var usedPercentage: Double {
+        guard totalBytes > 0 else { return 0 }
+        return Double(usedBytes) / Double(totalBytes) * 100.0
+    }
+
+    var usedFormatted: String {
+        ByteCountFormatter.string(fromByteCount: Int64(usedBytes), countStyle: .memory)
+    }
+
+    var totalFormatted: String {
+        ByteCountFormatter.string(fromByteCount: Int64(totalBytes), countStyle: .memory)
+    }
+
+    var appFormatted: String {
+        ByteCountFormatter.string(fromByteCount: Int64(appBytes), countStyle: .memory)
+    }
+
+    var wiredFormatted: String {
+        ByteCountFormatter.string(fromByteCount: Int64(wiredBytes), countStyle: .memory)
+    }
+
+    var compressedFormatted: String {
+        ByteCountFormatter.string(fromByteCount: Int64(compressedBytes), countStyle: .memory)
+    }
+
+    var freeFormatted: String {
+        ByteCountFormatter.string(fromByteCount: Int64(freeBytes), countStyle: .memory)
+    }
+
+    var pressureColor: Color {
+        if usedPercentage > 85 {
+            return .red
+        } else if usedPercentage > 70 {
+            return .orange
+        } else {
+            return .green
+        }
+    }
+
+    var pressureLabel: String {
+        if usedPercentage > 85 {
+            return "High"
+        } else if usedPercentage > 70 {
+            return "Moderate"
+        } else {
+            return "Normal"
+        }
+    }
+}
+
+enum SystemStats {
+    static func getMemoryInfo() -> SystemMemoryInfo {
+        var size = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size)
+        var vmStats = vm_statistics64()
+        let hostPort = mach_host_self()
+
+        let result = withUnsafeMutablePointer(to: &vmStats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(size)) {
+                host_statistics64(hostPort, HOST_VM_INFO64, $0, &size)
+            }
+        }
+
+        let totalBytes = ProcessInfo.processInfo.physicalMemory
+
+        guard result == KERN_SUCCESS else {
+            return SystemMemoryInfo(
+                totalBytes: totalBytes,
+                usedBytes: 0,
+                freeBytes: totalBytes,
+                appBytes: 0,
+                wiredBytes: 0,
+                compressedBytes: 0
+            )
+        }
+
+        var pageSize: vm_size_t = 0
+        host_page_size(hostPort, &pageSize)
+        let pSize = UInt64(pageSize)
+
+        let active = UInt64(vmStats.active_count) * pSize
+        let inactive = UInt64(vmStats.inactive_count) * pSize
+        let wired = UInt64(vmStats.wire_count) * pSize
+        let compressed = UInt64(vmStats.compressor_page_count) * pSize
+        let free = UInt64(vmStats.free_count) * pSize
+
+        let usedBytes = min(totalBytes, active + wired + compressed)
+        let freeBytes = totalBytes > usedBytes ? totalBytes - usedBytes : free
+
+        return SystemMemoryInfo(
+            totalBytes: totalBytes,
+            usedBytes: usedBytes,
+            freeBytes: freeBytes,
+            appBytes: active + inactive,
+            wiredBytes: wired,
+            compressedBytes: compressed
+        )
+    }
+}
+
+private func getBatteryInfo() -> (level: Int, isCharging: Bool)? {
+    guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() else { return nil }
+    guard let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef], !sources.isEmpty else { return nil }
+    for s in sources {
+        guard let desc = IOPSGetPowerSourceDescription(snapshot, s)?.takeUnretainedValue() as? [String: Any] else { continue }
+        if let cap = desc[kIOPSCurrentCapacityKey as String] as? Int {
+            let charging = (desc[kIOPSIsChargingKey as String] as? Bool) ?? false
+            return (cap, charging)
+        }
+    }
+    return nil
+}
+
+// MARK: - RAM Status Tile
+
+struct RAMStatusTile: View {
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1.5)) { _ in
+            let mem = SystemStats.getMemoryInfo()
+
+            VStack(alignment: .leading, spacing: 10) {
+                // Top row: Header icon, title, and memory pressure pill
+                HStack(alignment: .center) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "memorychip")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.purple.opacity(0.9))
+
+                        Text("Memory (RAM)")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.65))
+                    }
+
+                    Spacer()
+
+                    // Pressure pill (Normal / Moderate / High)
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(mem.pressureColor)
+                            .frame(width: 5, height: 5)
+
+                        Text(mem.pressureLabel)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(mem.pressureColor)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2.5)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(mem.pressureColor.opacity(0.12)))
+                }
+
+                // Main Metric: Used RAM vs Total RAM
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .lastTextBaseline, spacing: 6) {
+                        Text("\(Int(mem.usedPercentage))%")
+                            .font(.system(size: 26, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+
+                        Text("\(mem.usedFormatted) / \(mem.totalFormatted)")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+
+                    // Progress bar
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.white.opacity(0.08))
+                                .frame(height: 6)
+
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [mem.pressureColor.opacity(0.8), mem.pressureColor],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: max(4, geo.size.width * CGFloat(min(1.0, mem.usedPercentage / 100.0))), height: 6)
+                        }
+                    }
+                    .frame(height: 6)
+                    .padding(.top, 2)
+                }
+
+                Divider()
+                    .overlay(Color.white.opacity(0.08))
+
+                // Breakdown: App Memory, Wired, Available
+                VStack(spacing: 5) {
+                    HStack {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.blue.opacity(0.8)).frame(width: 4, height: 4)
+                            Text("App Memory")
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        Spacer()
+                        Text(mem.appFormatted)
+                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+
+                    HStack {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.orange.opacity(0.8)).frame(width: 4, height: 4)
+                            Text("Wired Memory")
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        Spacer()
+                        Text(mem.wiredFormatted)
+                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+
+                    HStack {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.green.opacity(0.8)).frame(width: 4, height: 4)
+                            Text("Available / Free")
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        Spacer()
+                        Text(mem.freeFormatted)
+                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
         }
     }
 }
@@ -716,19 +1003,6 @@ struct ClockTile: View {
         case 50..<80:  return "battery.75"
         default:       return "battery.100"
         }
-    }
-
-    private func getBatteryInfo() -> (level: Int, isCharging: Bool)? {
-        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() else { return nil }
-        guard let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef], !sources.isEmpty else { return nil }
-        for s in sources {
-            guard let desc = IOPSGetPowerSourceDescription(snapshot, s)?.takeUnretainedValue() as? [String: Any] else { continue }
-            if let cap = desc[kIOPSCurrentCapacityKey as String] as? Int {
-                let charging = (desc[kIOPSIsChargingKey as String] as? Bool) ?? false
-                return (cap, charging)
-            }
-        }
-        return nil
     }
 }
 

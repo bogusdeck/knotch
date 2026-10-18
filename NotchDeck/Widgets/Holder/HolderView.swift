@@ -38,7 +38,7 @@ struct HolderView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onDrop(of: [UTType.fileURL, UTType.item], isTargeted: $isTargetedForDrop) { providers in
+        .onDrop(of: DropURLHelper.supportedDropTypes, isTargeted: $isTargetedForDrop) { providers in
             handleDrop(providers: providers)
         }
     }
@@ -466,17 +466,12 @@ struct HolderView: View {
     // MARK: - Drop Handling
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        var handled = false
-        for provider in providers {
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url else { return }
-                Task { @MainActor in
-                    holderManager.addItem(from: url)
-                }
+        DropURLHelper.extractURLs(from: providers) { urls in
+            for url in urls {
+                holderManager.addItem(from: url)
             }
-            handled = true
         }
-        return handled
+        return true
     }
 }
 

@@ -42,7 +42,7 @@ struct NotchRootView: View {
         // Transparent outside the background shape
         .background(.clear)
         // Drag hover target on the notch — expands on hover, adds items on drop
-        .onDrop(of: [UTType.fileURL], isTargeted: $isDragHoveringNotch) { providers in
+        .onDrop(of: DropURLHelper.supportedDropTypes, isTargeted: $isDragHoveringNotch) { providers in
             handleDrop(providers: providers)
         }
         .onChange(of: isDragHoveringNotch) { _, isHovering in
@@ -199,23 +199,22 @@ struct NotchRootView: View {
     // MARK: - Drop Handling
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        var handled = false
-        for provider in providers {
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url else { return }
-                Task { @MainActor in
-                    if self.configManager.config.layout.tabs.contains("holder") {
-                        self.holderManager.addItem(from: url)
-                    } else {
-                        self.shelfManager.addItem(
-                            from: url,
-                            copyOnDrop: self.configManager.config.general.copyOnDrop
-                        )
+        DropURLHelper.extractURLs(from: providers) { urls in
+            for url in urls {
+                let isApp = url.pathExtension.lowercased() == "app" || url.path.hasSuffix(".app")
+                if isApp || self.configManager.config.layout.tabs.contains("holder") {
+                    self.holderManager.addItem(from: url)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        self.viewModel.activeTab = .holder
                     }
+                } else {
+                    self.shelfManager.addItem(
+                        from: url,
+                        copyOnDrop: self.configManager.config.general.copyOnDrop
+                    )
                 }
             }
-            handled = true
         }
-        return handled
+        return true
     }
 }
