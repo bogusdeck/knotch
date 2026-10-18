@@ -10,7 +10,7 @@ final class TerminalContainerView: NSView {
     private(set) var currentTerminalView: LocalProcessTerminalView?
 
     func setTerminalView(_ newView: LocalProcessTerminalView) {
-        if currentTerminalView !== newView {
+        if currentTerminalView !== newView || newView.superview !== self {
             currentTerminalView?.removeFromSuperview()
             currentTerminalView = newView
 

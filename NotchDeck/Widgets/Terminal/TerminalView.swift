@@ -95,8 +95,8 @@ struct TerminalView: View {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.secondary)
-                            .padding(4)
-                            .background(Color.white.opacity(0.06))
+                            .frame(width: 24, height: 22)
+                            .background(Color.white.opacity(0.08))
                             .clipShape(RoundedRectangle(cornerRadius: 5))
                     }
                     .buttonStyle(.plain)
@@ -198,6 +198,19 @@ struct TerminalView: View {
 final class ModalPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    var cardRect: CGRect = .zero
+    var onBackdropClick: (() -> Void)?
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown {
+            if !cardRect.isEmpty && !cardRect.contains(event.locationInWindow) {
+                onBackdropClick?()
+                return // Swallow click so it closes the modal only
+            }
+        }
+        super.sendEvent(event)
+    }
 }
 
 @MainActor
@@ -207,39 +220,68 @@ final class TerminalZoomModalController: NSObject, ObservableObject {
     @Published var isPresented: Bool = false
     @Published var session: TerminalSession?
 
-    private var window: NSPanel?
+    var onDismiss: (() -> Void)?
+
+    private var window: ModalPanel?
 
     func present(session: TerminalSession) {
         self.session = session
         self.isPresented = true
 
-        let screen = NSScreen.main ?? NSScreen.screens.first!
+        let mouseLoc = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first(where: { NSMouseInRect(mouseLoc, $0.frame, false) }) ?? NSScreen.main ?? NSScreen.screens.first!
         let screenFrame = screen.frame
 
-        if let existing = window {
-            existing.setFrame(screenFrame, display: true)
-            existing.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+        let cardWidth = min(screenFrame.width * 0.88, 1040)
+        let cardHeight = min(screenFrame.height * 0.82, 660)
+        let cardRect = CGRect(
+            x: (screenFrame.width - cardWidth) / 2,
+            y: (screenFrame.height - cardHeight) / 2,
+            width: cardWidth,
+            height: cardHeight
+        )
+
+        let panel: ModalPanel
+        if let existing = self.window {
+            panel = existing
+            panel.setFrame(screenFrame, display: true)
         } else {
-            let panel = ModalPanel(
+            panel = ModalPanel(
                 contentRect: screenFrame,
                 styleMask: [.borderless],
                 backing: .buffered,
                 defer: false
             )
             panel.isFloatingPanel = true
-            panel.level = .statusBar + 3
+            panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 2)
             panel.backgroundColor = .clear
             panel.isOpaque = false
             panel.hasShadow = false
             panel.ignoresMouseEvents = false
-
-            let rootView = TerminalZoomModalView(controller: self)
-            panel.contentView = NSHostingView(rootView: rootView)
+            panel.acceptsMouseMovedEvents = true
+            panel.hidesOnDeactivate = false
+            panel.collectionBehavior = [
+                .canJoinAllSpaces,
+                .fullScreenAuxiliary,
+                .stationary,
+                .ignoresCycle
+            ]
             self.window = panel
-            panel.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
         }
+
+        panel.cardRect = cardRect
+        panel.onBackdropClick = { [weak self] in
+            self?.dismiss()
+        }
+
+        let rootView = TerminalZoomModalView(
+            controller: self,
+            cardWidth: cardWidth,
+            cardHeight: cardHeight
+        )
+        panel.contentView = NSHostingView(rootView: rootView)
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func dismiss() {
@@ -247,16 +289,19 @@ final class TerminalZoomModalController: NSObject, ObservableObject {
         isPresented = false
         session = nil
         window?.orderOut(nil)
+        onDismiss?()
     }
 }
 
 struct TerminalZoomModalView: View {
     @ObservedObject var controller: TerminalZoomModalController
+    let cardWidth: CGFloat
+    let cardHeight: CGFloat
 
     var body: some View {
         ZStack {
             // Darkened backdrop covering the whole screen — clicking outside closes the modal!
-            Color.black.opacity(0.58)
+            Color.black.opacity(0.60)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {
@@ -270,7 +315,7 @@ struct TerminalZoomModalView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "terminal.fill")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(.white.opacity(0.85))
 
                         Text(session.title)
                             .font(.system(size: 13, weight: .semibold))
@@ -282,28 +327,33 @@ struct TerminalZoomModalView: View {
 
                         Spacer()
 
-                        Text("Click outside to exit full screen")
+                        Text("Click outside to exit")
                             .font(.system(size: 11))
                             .foregroundStyle(.white.opacity(0.45))
 
                         Button {
                             controller.dismiss()
                         } label: {
-                            Image(systemName: "arrow.down.right.and.arrow.up.left")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.85))
-                                .frame(width: 24, height: 24)
-                                .background(Color.white.opacity(0.12))
-                                .clipShape(Circle())
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text("Exit Full Screen")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .foregroundStyle(.white.opacity(0.9))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(Color.white.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.plain)
                         .help("Exit Full Screen")
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(Color.black.opacity(0.4))
+                    .background(Color.black.opacity(0.45))
 
-                    Divider().overlay(Color.white.opacity(0.1))
+                    Divider().overlay(Color.white.opacity(0.12))
 
                     // Full size terminal view
                     TerminalRepresentable(terminalView: session.terminalView)
@@ -311,23 +361,16 @@ struct TerminalZoomModalView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding(10)
                 }
-                .frame(
-                    width: min((NSScreen.main?.visibleFrame.width ?? 1100) * 0.88, 1040),
-                    height: min((NSScreen.main?.visibleFrame.height ?? 750) * 0.82, 660)
-                )
+                .frame(width: cardWidth, height: cardHeight)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(Color(NSColor.windowBackgroundColor).opacity(0.96))
-                        .shadow(color: .black.opacity(0.65), radius: 35, x: 0, y: 18)
+                        .fill(Color(NSColor.windowBackgroundColor).opacity(0.97))
+                        .shadow(color: .black.opacity(0.7), radius: 36, x: 0, y: 18)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(Color.white.opacity(0.15), lineWidth: 1)
                 )
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    // Swallow tap inside card so it doesn't trigger backdrop dismiss
-                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
