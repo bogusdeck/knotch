@@ -57,16 +57,30 @@ final class NotchPanelController: NSObject {
         widgetRegistry.register(NotesWidget(notesManager: notesManager, viewModel: viewModel))
         widgetRegistry.register(ShelfWidget(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop))
         widgetRegistry.register(MediaWidget(mediaManager: mediaManager))
-        widgetRegistry.register(TerminalWidget())
+        widgetRegistry.register(TerminalWidget(viewModel: viewModel))
         widgetRegistry.syncConfiguredWidgets(configs: configManager.config.widgets)
         TerminalManager.shared.syncConfiguredSessions(widgets: configManager.config.widgets)
 
-        TerminalZoomModalController.shared.onDismiss = { [weak self] in
+        viewModel.onTerminalZoomToggled = { [weak self] in
             guard let self = self else { return }
             if self.viewModel.state == .expanded {
-                self.panel.makeKeyAndOrderFront(nil)
+                self.resizePanel(for: .expanded, animated: true)
             }
         }
+
+        viewModel.$activeTab
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] newTab in
+                guard let self = self else { return }
+                if self.viewModel.isTerminalZoomed && newTab != .terminal {
+                    self.viewModel.isTerminalZoomed = false
+                    if self.viewModel.state == .expanded {
+                        self.resizePanel(for: .expanded, animated: true)
+                    }
+                }
+            }
+            .store(in: &cancellables)
 
         observeConfig()
     }
@@ -163,10 +177,10 @@ final class NotchPanelController: NSObject {
     func collapse() {
         logger.debug("→ collapsed")
         peekTimer?.cancel()
-        TerminalZoomModalController.shared.dismiss()
         withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
             viewModel.state = .collapsed
             viewModel.isSettingsActive = false
+            viewModel.isTerminalZoomed = false
         }
         resizePanel(for: .collapsed, animated: true)
         // Return focus to whichever app was previously active
@@ -238,8 +252,18 @@ final class NotchPanelController: NSObject {
             )
 
         case .expanded:
-            let w = CGFloat(cfg.expandedWidth)
-            let h = CGFloat(cfg.expandedHeight)
+            let w: CGFloat
+            let h: CGFloat
+            if viewModel.isTerminalZoomed && viewModel.activeTab == .terminal {
+                let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
+                let maxW = (screen?.visibleFrame.width ?? 1200) * 0.90
+                let maxH = (screen?.visibleFrame.height ?? 800) * 0.78
+                w = min(maxW, 1040)
+                h = min(maxH, 620)
+            } else {
+                w = CGFloat(cfg.expandedWidth)
+                h = CGFloat(cfg.expandedHeight)
+            }
             return CGRect(
                 x: geometry.notchFrame.midX - w / 2,
                 y: geometry.notchFrame.maxY - h,
@@ -319,13 +343,11 @@ extension NotchPanelController {
         if viewModel.state == .peek {
             collapse()
         } else if viewModel.state == .expanded && configManager.config.general.hoverToExpand {
-            // Keep expanded if note input is actively focused or zoom modal is open
+            // Keep expanded if note input or text field is actively focused
             guard !viewModel.requestFocusOnNoteInput else { return }
-            if TerminalZoomModalController.shared.isPresented { return }
             peekTimer = Task {
                 try? await Task.sleep(nanoseconds: 700_000_000) // 700ms grace period
                 guard !Task.isCancelled else { return }
-                if TerminalZoomModalController.shared.isPresented { return }
                 let mouseLocation = NSEvent.mouseLocation
                 if !self.panel.frame.contains(mouseLocation) {
                     self.collapse()
@@ -340,10 +362,6 @@ extension NotchPanelController {
 extension NotchPanelController: NSWindowDelegate {
 
     func windowDidResignKey(_ notification: Notification) {
-        // Do not collapse when NotchPanel resigns key because the zoom modal became key
-        if TerminalZoomModalController.shared.isPresented {
-            return
-        }
         // Collapse when another window becomes key, unless we're intentionally
         // keeping a text field focused
         if viewModel.state == .expanded && !viewModel.requestFocusOnNoteInput {

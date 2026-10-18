@@ -36,10 +36,14 @@ final class NotchViewModel: ObservableObject {
     /// Geometry is updated on screen-change notifications.
     @Published var geometry: NotchGeometry
 
+    /// Whether the terminal panel is expanded to enlarged full-size dimensions
+    @Published var isTerminalZoomed: Bool = false
+
     /// Callbacks invoked when a view needs to trigger panel window expansion/collapse/peek
     var onExpandRequested: (@MainActor () -> Void)?
     var onCollapseRequested: (@MainActor () -> Void)?
     var onPeekRequested: (@MainActor () -> Void)?
+    var onTerminalZoomToggled: (@MainActor () -> Void)?
 
     func requestExpand() {
         onExpandRequested?()
@@ -51,6 +55,11 @@ final class NotchViewModel: ObservableObject {
 
     func requestPeek() {
         onPeekRequested?()
+    }
+
+    func toggleTerminalZoom() {
+        isTerminalZoomed.toggle()
+        onTerminalZoomToggled?()
     }
 
     func openSettingsInsideNotch(category: SettingsCategory = .general) {

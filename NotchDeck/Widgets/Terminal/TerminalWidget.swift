@@ -7,11 +7,13 @@ struct TerminalWidget: NotchWidget {
     let id: String
     let title: String
     let iconName: String?
+    weak var viewModel: NotchViewModel?
 
-    init(id: String = "terminal", title: String = "Terminal", iconName: String? = "terminal") {
+    init(id: String = "terminal", title: String = "Terminal", iconName: String? = "terminal", viewModel: NotchViewModel? = nil) {
         self.id = id
         self.title = title
         self.iconName = iconName
+        self.viewModel = viewModel
     }
 
     func compactView() -> AnyView {
@@ -22,7 +24,7 @@ struct TerminalWidget: NotchWidget {
 
     func expandedView() -> AnyView {
         AnyView(
-            TerminalView()
+            TerminalView(viewModel: viewModel)
         )
     }
 }

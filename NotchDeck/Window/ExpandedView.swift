@@ -277,7 +277,7 @@ struct ExpandedView: View {
             case .shelf:
                 ShelfView(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop)
             case .terminal:
-                TerminalView()
+                TerminalView(viewModel: viewModel)
             case .vpn:
                 if let actionWidget = widgetRegistry.actionWidget(id: "vpn-status") ?? widgetRegistry.allActionWidgets.first(where: { $0.id.contains("vpn") }) {
                     VPNView(widget: actionWidget)
