@@ -125,8 +125,33 @@ final class NotchPanelController: NSObject {
             calendarManager: calendarManager,
             widgetRegistry: widgetRegistry
         )
-        let hostingView = NSHostingView(rootView: rootView)
+        let hostingView = NotchHostingView(rootView: rootView)
         hostingView.layer?.backgroundColor = .clear
+
+        hostingView.onDragEntered = { [weak self] in
+            guard let self else { return }
+            logger.info("Drag entered NotchPanel!")
+            self.peekTimer?.cancel()
+            if self.viewModel.state != .expanded {
+                self.expand()
+            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                self.viewModel.activeTab = .holder
+            }
+        }
+
+        hostingView.onPerformDrag = { [weak self] sender in
+            guard let self else { return false }
+            let urls = self.extractURLsFromPasteboard(sender.draggingPasteboard)
+            guard !urls.isEmpty else { return false }
+            for url in urls {
+                self.holderManager.addItem(from: url)
+            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                self.viewModel.activeTab = .holder
+            }
+            return true
+        }
 
         // Install mouse-tracking delegate
         panel.delegate = self
@@ -141,6 +166,34 @@ final class NotchPanelController: NSObject {
         observeScreenChanges()
 
         logger.info("NotchPanel shown at \(self.panel.frame.debugDescription)")
+    }
+
+    private func extractURLsFromPasteboard(_ pb: NSPasteboard) -> [URL] {
+        var results: [URL] = []
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL], !urls.isEmpty {
+            results.append(contentsOf: urls)
+        }
+        if results.isEmpty, let filenames = pb.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String] {
+            for name in filenames {
+                results.append(URL(fileURLWithPath: name))
+            }
+        }
+        if results.isEmpty, let string = pb.string(forType: .string) {
+            if string.hasPrefix("file://"), let url = URL(string: string) {
+                results.append(url)
+            } else if FileManager.default.fileExists(atPath: string) {
+                results.append(URL(fileURLWithPath: string))
+            }
+        }
+        if results.isEmpty, let items = pb.pasteboardItems {
+            for item in items {
+                if let str = item.string(forType: .fileURL) ?? item.string(forType: NSPasteboard.PasteboardType("public.file-url")),
+                   let url = URL(string: str) {
+                    results.append(url)
+                }
+            }
+        }
+        return results
     }
 
     // MARK: - Positioning
@@ -370,5 +423,49 @@ extension NotchPanelController: NSWindowDelegate {
         if viewModel.state == .expanded && !viewModel.requestFocusOnNoteInput {
             collapse()
         }
+    }
+}
+
+// MARK: - NotchHostingView (Custom Dragging Destination)
+
+final class NotchHostingView<Content: View>: NSHostingView<Content> {
+
+    var onDragEntered: (() -> Void)?
+    var onDragExited: (() -> Void)?
+    var onPerformDrag: ((any NSDraggingInfo) -> Bool)?
+
+    @MainActor required init(rootView: Content) {
+        super.init(rootView: rootView)
+        registerForDraggedTypes([
+            .fileURL,
+            .URL,
+            .string,
+            NSPasteboard.PasteboardType("public.item"),
+            NSPasteboard.PasteboardType("com.apple.application-bundle"),
+            NSPasteboard.PasteboardType("public.file-url"),
+            NSPasteboard.PasteboardType("NSFilenamesPboardType")
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        onDragEntered?()
+        return .copy
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        return .copy
+    }
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        onDragExited?()
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        return onPerformDrag?(sender) ?? false
     }
 }

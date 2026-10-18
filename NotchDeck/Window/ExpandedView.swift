@@ -549,23 +549,35 @@ struct HomeDashboardView: View {
         configManager.config.layout.home.contains("ram-status")
     }
 
+    private var isCPUWidgetEnabled: Bool {
+        configManager.config.layout.home.contains("cpu") ||
+        configManager.config.layout.home.contains("processor") ||
+        configManager.config.layout.home.contains("cpu-status") ||
+        configManager.config.layout.home.contains("processing")
+    }
+
     private var isClockWidgetEnabled: Bool {
         configManager.config.layout.home.contains("clock")
     }
 
-    private var rightWidget: String? {
-        if isRAMWidgetEnabled {
-            return "ram"
+    private var rightWidgetIds: [String] {
+        var ids: [String] = []
+        for id in configManager.config.layout.home {
+            if id == "ram" || id == "memory" || id == "ram-status" {
+                if !ids.contains("ram") { ids.append("ram") }
+            } else if id == "cpu" || id == "processor" || id == "cpu-status" || id == "processing" {
+                if !ids.contains("cpu") { ids.append("cpu") }
+            } else if id == "clock" {
+                if !ids.contains("clock") { ids.append("clock") }
+            }
         }
-        if isClockWidgetEnabled {
-            return "clock"
-        }
-        return nil
+        return ids
     }
 
     private var leftWidgetIds: [String] {
         let items = configManager.config.layout.home.filter {
-            $0 != "clock" && $0 != "ram" && $0 != "memory" && $0 != "ram-status"
+            $0 != "clock" && $0 != "ram" && $0 != "memory" && $0 != "ram-status" &&
+            $0 != "cpu" && $0 != "processor" && $0 != "cpu-status" && $0 != "processing"
         }
         return items.isEmpty ? ["media"] : items
     }
@@ -583,15 +595,24 @@ struct HomeDashboardView: View {
             }
             .frame(maxWidth: .infinity)
 
-            // Right Column: RAM / Memory Status card OR Clock & Time card
-            if let right = rightWidget {
-                VStack(spacing: 12) {
-                    if right == "ram" {
-                        RAMStatusTile()
-                    } else {
-                        ClockTile(calendarManager: calendarManager)
+            // Right Column: RAM / CPU / Clock cards
+            if !rightWidgetIds.isEmpty {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 10) {
+                        ForEach(rightWidgetIds, id: \.self) { rightId in
+                            switch rightId {
+                            case "ram":
+                                RAMStatusTile()
+                            case "cpu":
+                                CPUStatusTile()
+                            case "clock":
+                                ClockTile(calendarManager: calendarManager)
+                            default:
+                                EmptyView()
+                            }
+                        }
                     }
-                    Spacer(minLength: 0)
+                    .padding(.vertical, 2)
                 }
                 .frame(width: 220)
             }
@@ -607,6 +628,8 @@ struct HomeDashboardView: View {
             MediaView(mediaManager: mediaManager)
         case "ram", "memory", "ram-status":
             RAMStatusTile()
+        case "cpu", "processor", "cpu-status", "processing":
+            CPUStatusTile()
         case "clock":
             ClockTile(calendarManager: calendarManager)
         case "calendar":
@@ -730,6 +753,171 @@ enum SystemStats {
             compressedBytes: compressed
         )
     }
+
+    static func getCPUInfo() -> SystemCPUInfo {
+        CPUStatsTracker.shared.getCPUInfo()
+    }
+}
+
+// MARK: - System CPU Info & Tracker
+
+struct SystemCPUInfo: Sendable {
+    let usagePercentage: Double
+    let userPercentage: Double
+    let systemPercentage: Double
+    let idlePercentage: Double
+    let coreCount: Int
+    let chipBrand: String
+    let load1m: Double
+    let load5m: Double
+    let load15m: Double
+
+    var brandSubtitle: String {
+        "\(chipBrand) • \(coreCount) Cores"
+    }
+
+    var userFormatted: String {
+        String(format: "%.1f%%", userPercentage)
+    }
+
+    var systemFormatted: String {
+        String(format: "%.1f%%", systemPercentage)
+    }
+
+    var idleFormatted: String {
+        String(format: "%.1f%%", idlePercentage)
+    }
+
+    var loadFormatted: String {
+        String(format: "%.2f", load1m)
+    }
+
+    var pressureColor: Color {
+        if usagePercentage > 85 {
+            return .red
+        } else if usagePercentage > 60 {
+            return .orange
+        } else {
+            return .cyan
+        }
+    }
+
+    var pressureLabel: String {
+        if usagePercentage > 85 {
+            return "High"
+        } else if usagePercentage > 60 {
+            return "Moderate"
+        } else {
+            return "Normal"
+        }
+    }
+}
+
+final class CPUStatsTracker: @unchecked Sendable {
+    static let shared = CPUStatsTracker()
+
+    private var prevTicks: (user: UInt64, sys: UInt64, idle: UInt64, nice: UInt64)? = nil
+    private var lastInfo: SystemCPUInfo? = nil
+    private let lock = NSLock()
+
+    private let chipBrand: String = {
+        var size = 0
+        sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0)
+        guard size > 0 else { return "Apple Silicon" }
+        var machine = [CChar](repeating: 0, count: size)
+        sysctlbyname("machdep.cpu.brand_string", &machine, &size, nil, 0)
+        let brand = String(cString: machine).trimmingCharacters(in: .whitespacesAndNewlines)
+        return brand.isEmpty ? "Apple Silicon" : brand
+    }()
+
+    private init() {
+        prevTicks = sampleTicks()
+    }
+
+    private func sampleTicks() -> (user: UInt64, sys: UInt64, idle: UInt64, nice: UInt64)? {
+        var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
+        var cpuLoad = host_cpu_load_info()
+        let hostPort = mach_host_self()
+        let result = withUnsafeMutablePointer(to: &cpuLoad) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics(hostPort, HOST_CPU_LOAD_INFO, $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return nil }
+        return (
+            user: UInt64(cpuLoad.cpu_ticks.0),
+            sys: UInt64(cpuLoad.cpu_ticks.1),
+            idle: UInt64(cpuLoad.cpu_ticks.2),
+            nice: UInt64(cpuLoad.cpu_ticks.3)
+        )
+    }
+
+    func getCPUInfo() -> SystemCPUInfo {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let coreCount = ProcessInfo.processInfo.activeProcessorCount
+        var loadavg = [Double](repeating: 0.0, count: 3)
+        getloadavg(&loadavg, 3)
+
+        guard let currentTicks = sampleTicks() else {
+            return lastInfo ?? SystemCPUInfo(
+                usagePercentage: 0,
+                userPercentage: 0,
+                systemPercentage: 0,
+                idlePercentage: 100,
+                coreCount: coreCount,
+                chipBrand: chipBrand,
+                load1m: loadavg[0],
+                load5m: loadavg[1],
+                load15m: loadavg[2]
+            )
+        }
+
+        guard let prev = prevTicks else {
+            prevTicks = currentTicks
+            let initial = SystemCPUInfo(
+                usagePercentage: 0,
+                userPercentage: 0,
+                systemPercentage: 0,
+                idlePercentage: 100,
+                coreCount: coreCount,
+                chipBrand: chipBrand,
+                load1m: loadavg[0],
+                load5m: loadavg[1],
+                load15m: loadavg[2]
+            )
+            lastInfo = initial
+            return initial
+        }
+
+        let dUser = Double(currentTicks.user >= prev.user ? currentTicks.user - prev.user : 0)
+        let dSys = Double(currentTicks.sys >= prev.sys ? currentTicks.sys - prev.sys : 0)
+        let dIdle = Double(currentTicks.idle >= prev.idle ? currentTicks.idle - prev.idle : 0)
+        let dNice = Double(currentTicks.nice >= prev.nice ? currentTicks.nice - prev.nice : 0)
+        let total = dUser + dSys + dIdle + dNice
+
+        prevTicks = currentTicks
+
+        let userPct = total > 0 ? (dUser + dNice) / total * 100.0 : 0
+        let sysPct = total > 0 ? dSys / total * 100.0 : 0
+        let idlePct = total > 0 ? dIdle / total * 100.0 : 100.0
+        let totalUsage = min(100.0, max(0.0, userPct + sysPct))
+
+        let info = SystemCPUInfo(
+            usagePercentage: totalUsage,
+            userPercentage: userPct,
+            systemPercentage: sysPct,
+            idlePercentage: idlePct,
+            coreCount: coreCount,
+            chipBrand: chipBrand,
+            load1m: loadavg[0],
+            load5m: loadavg[1],
+            load15m: loadavg[2]
+        )
+        lastInfo = info
+        return info
+    }
 }
 
 private func getBatteryInfo() -> (level: Int, isCharging: Bool)? {
@@ -752,7 +940,7 @@ struct RAMStatusTile: View {
         TimelineView(.periodic(from: .now, by: 1.5)) { _ in
             let mem = SystemStats.getMemoryInfo()
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 // Top row: Header icon, title, and memory pressure pill
                 HStack(alignment: .center) {
                     HStack(spacing: 5) {
@@ -783,25 +971,25 @@ struct RAMStatusTile: View {
                 }
 
                 // Main Metric: Used RAM vs Total RAM
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .lastTextBaseline, spacing: 6) {
                         Text("\(Int(mem.usedPercentage))%")
-                            .font(.system(size: 26, weight: .semibold, design: .rounded))
+                            .font(.system(size: 24, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white)
 
                         Text("\(mem.usedFormatted) / \(mem.totalFormatted)")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.6))
                     }
 
                     // Progress bar
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: 3.5)
                                 .fill(Color.white.opacity(0.08))
-                                .frame(height: 6)
+                                .frame(height: 5)
 
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: 3.5)
                                 .fill(
                                     LinearGradient(
                                         colors: [mem.pressureColor.opacity(0.8), mem.pressureColor],
@@ -809,10 +997,10 @@ struct RAMStatusTile: View {
                                         endPoint: .trailing
                                     )
                                 )
-                                .frame(width: max(4, geo.size.width * CGFloat(min(1.0, mem.usedPercentage / 100.0))), height: 6)
+                                .frame(width: max(4, geo.size.width * CGFloat(min(1.0, mem.usedPercentage / 100.0))), height: 5)
                         }
                     }
-                    .frame(height: 6)
+                    .frame(height: 5)
                     .padding(.top, 2)
                 }
 
@@ -820,17 +1008,17 @@ struct RAMStatusTile: View {
                     .overlay(Color.white.opacity(0.08))
 
                 // Breakdown: App Memory, Wired, Available
-                VStack(spacing: 5) {
+                VStack(spacing: 4) {
                     HStack {
                         HStack(spacing: 4) {
                             Circle().fill(Color.blue.opacity(0.8)).frame(width: 4, height: 4)
                             Text("App Memory")
-                                .font(.system(size: 9.5))
+                                .font(.system(size: 9))
                                 .foregroundStyle(.white.opacity(0.5))
                         }
                         Spacer()
                         Text(mem.appFormatted)
-                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.75))
                     }
 
@@ -838,12 +1026,12 @@ struct RAMStatusTile: View {
                         HStack(spacing: 4) {
                             Circle().fill(Color.orange.opacity(0.8)).frame(width: 4, height: 4)
                             Text("Wired Memory")
-                                .font(.system(size: 9.5))
+                                .font(.system(size: 9))
                                 .foregroundStyle(.white.opacity(0.5))
                         }
                         Spacer()
                         Text(mem.wiredFormatted)
-                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.75))
                     }
 
@@ -851,17 +1039,146 @@ struct RAMStatusTile: View {
                         HStack(spacing: 4) {
                             Circle().fill(Color.green.opacity(0.8)).frame(width: 4, height: 4)
                             Text("Available / Free")
-                                .font(.system(size: 9.5))
+                                .font(.system(size: 9))
                                 .foregroundStyle(.white.opacity(0.5))
                         }
                         Spacer()
                         Text(mem.freeFormatted)
-                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.75))
                     }
                 }
             }
-            .padding(14)
+            .padding(11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+    }
+}
+
+// MARK: - CPU / Processor Status Tile
+
+struct CPUStatusTile: View {
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1.5)) { _ in
+            let cpu = SystemStats.getCPUInfo()
+
+            VStack(alignment: .leading, spacing: 8) {
+                // Top row: Header icon, title, and CPU pressure pill
+                HStack(alignment: .center) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "cpu")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.cyan.opacity(0.9))
+
+                        Text("Processor (CPU)")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.65))
+                    }
+
+                    Spacer()
+
+                    // Pressure pill (Normal / Moderate / High)
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(cpu.pressureColor)
+                            .frame(width: 5, height: 5)
+
+                        Text(cpu.pressureLabel)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(cpu.pressureColor)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2.5)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(cpu.pressureColor.opacity(0.12)))
+                }
+
+                // Main Metric: Usage % and Core / Chip info
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .lastTextBaseline, spacing: 6) {
+                        Text("\(Int(cpu.usagePercentage))%")
+                            .font(.system(size: 24, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+
+                        Text(cpu.brandSubtitle)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .lineLimit(1)
+                    }
+
+                    // Progress bar
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3.5)
+                                .fill(Color.white.opacity(0.08))
+                                .frame(height: 5)
+
+                            RoundedRectangle(cornerRadius: 3.5)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [cpu.pressureColor.opacity(0.8), cpu.pressureColor],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: max(4, geo.size.width * CGFloat(min(1.0, cpu.usagePercentage / 100.0))), height: 5)
+                        }
+                    }
+                    .frame(height: 5)
+                    .padding(.top, 2)
+                }
+
+                Divider()
+                    .overlay(Color.white.opacity(0.08))
+
+                // Breakdown: User Processes, System / Kernel, Idle
+                VStack(spacing: 4) {
+                    HStack {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.cyan.opacity(0.8)).frame(width: 4, height: 4)
+                            Text("User Processes")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        Spacer()
+                        Text(cpu.userFormatted)
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+
+                    HStack {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.indigo.opacity(0.8)).frame(width: 4, height: 4)
+                            Text("System / Kernel")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        Spacer()
+                        Text(cpu.systemFormatted)
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+
+                    HStack {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.teal.opacity(0.8)).frame(width: 4, height: 4)
+                            Text("Idle Capacity")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        Spacer()
+                        Text(cpu.idleFormatted)
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+                }
+            }
+            .padding(11)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.white.opacity(0.05))
             .cornerRadius(12)

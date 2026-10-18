@@ -56,6 +56,17 @@ final class NotchPanel: NSPanel {
         // Accept mouse events without activating the panel
         acceptsMouseMovedEvents    = true
         ignoresMouseEvents         = false
+
+        // Register for dragged types so WindowServer delivers drag events to the notch
+        registerForDraggedTypes([
+            .fileURL,
+            .URL,
+            .string,
+            NSPasteboard.PasteboardType("public.item"),
+            NSPasteboard.PasteboardType("com.apple.application-bundle"),
+            NSPasteboard.PasteboardType("public.file-url"),
+            NSPasteboard.PasteboardType("NSFilenamesPboardType")
+        ])
     }
 
     // MARK: - Focus management
