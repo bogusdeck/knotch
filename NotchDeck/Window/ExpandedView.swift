@@ -11,6 +11,7 @@ struct ExpandedView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var notesManager: NotesManager
     @ObservedObject var shelfManager: ShelfManager
+    @ObservedObject var holderManager: HolderManager
     @ObservedObject var mediaManager: MediaManager
     @ObservedObject var calendarManager: CalendarManager
     @ObservedObject var widgetRegistry: WidgetRegistry
@@ -278,6 +279,8 @@ struct ExpandedView: View {
                 ShelfView(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop)
             case .terminal:
                 TerminalView(viewModel: viewModel)
+            case .holder:
+                HolderView(holderManager: holderManager)
             case .vpn:
                 if let actionWidget = widgetRegistry.actionWidget(id: "vpn-status") ?? widgetRegistry.allActionWidgets.first(where: { $0.id.contains("vpn") }) {
                     VPNView(widget: actionWidget)
@@ -502,6 +505,7 @@ extension NotchTab {
         case .notes:    "Notes"
         case .shelf:    "Shelf"
         case .terminal: "Terminal"
+        case .holder:   "Holder"
         case .vpn:      "VPN"
         }
     }
@@ -512,6 +516,7 @@ extension NotchTab {
         case .notes:    "note.text"
         case .shelf:    "tray.2"
         case .terminal: "terminal"
+        case .holder:   "macwindow.on.rectangle"
         case .vpn:      "lock.shield"
         }
     }

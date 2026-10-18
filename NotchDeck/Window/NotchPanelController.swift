@@ -31,6 +31,7 @@ final class NotchPanelController: NSObject {
 
     let notesManager = NotesManager()
     let shelfManager = ShelfManager()
+    let holderManager = HolderManager()
     let mediaManager = MediaManager()
     let calendarManager = CalendarManager()
     let widgetRegistry = WidgetRegistry()
@@ -56,6 +57,7 @@ final class NotchPanelController: NSObject {
 
         widgetRegistry.register(NotesWidget(notesManager: notesManager, viewModel: viewModel))
         widgetRegistry.register(ShelfWidget(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop))
+        widgetRegistry.register(HolderWidget(holderManager: holderManager))
         widgetRegistry.register(MediaWidget(mediaManager: mediaManager))
         widgetRegistry.register(TerminalWidget(viewModel: viewModel))
         widgetRegistry.syncConfiguredWidgets(configs: configManager.config.widgets)
@@ -118,6 +120,7 @@ final class NotchPanelController: NSObject {
             configManager: configManager,
             notesManager: notesManager,
             shelfManager: shelfManager,
+            holderManager: holderManager,
             mediaManager: mediaManager,
             calendarManager: calendarManager,
             widgetRegistry: widgetRegistry

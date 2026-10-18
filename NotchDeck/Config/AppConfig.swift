@@ -50,7 +50,7 @@ struct AppearanceConfig: Sendable, Equatable {
 // MARK: - Layout
 
 struct LayoutConfig: Sendable, Equatable {
-    var tabs: [String] = ["home", "notes", "shelf", "terminal", "vpn"]
+    var tabs: [String] = ["home", "notes", "terminal", "holder", "vpn"]
     var home: [String] = ["media", "clock", "calendar", "vpn-status"]
 
     static let `default` = LayoutConfig()

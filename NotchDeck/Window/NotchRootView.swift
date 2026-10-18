@@ -12,6 +12,7 @@ struct NotchRootView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var notesManager: NotesManager
     @ObservedObject var shelfManager: ShelfManager
+    @ObservedObject var holderManager: HolderManager
     @ObservedObject var mediaManager: MediaManager
     @ObservedObject var calendarManager: CalendarManager
     @ObservedObject var widgetRegistry: WidgetRegistry
@@ -49,7 +50,11 @@ struct NotchRootView: View {
                 if viewModel.state != .expanded {
                     viewModel.requestExpand()
                 }
-                viewModel.activeTab = .shelf
+                if configManager.config.layout.tabs.contains("holder") {
+                    viewModel.activeTab = .holder
+                } else if configManager.config.layout.tabs.contains("shelf") {
+                    viewModel.activeTab = .shelf
+                }
             }
         }
         // ESC to collapse
@@ -104,6 +109,7 @@ struct NotchRootView: View {
                 configManager: configManager,
                 notesManager: notesManager,
                 shelfManager: shelfManager,
+                holderManager: holderManager,
                 mediaManager: mediaManager,
                 calendarManager: calendarManager,
                 widgetRegistry: widgetRegistry
@@ -198,10 +204,14 @@ struct NotchRootView: View {
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
                 guard let url else { return }
                 Task { @MainActor in
-                    shelfManager.addItem(
-                        from: url,
-                        copyOnDrop: configManager.config.general.copyOnDrop
-                    )
+                    if self.configManager.config.layout.tabs.contains("holder") {
+                        self.holderManager.addItem(from: url)
+                    } else {
+                        self.shelfManager.addItem(
+                            from: url,
+                            copyOnDrop: self.configManager.config.general.copyOnDrop
+                        )
+                    }
                 }
             }
             handled = true

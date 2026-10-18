@@ -29,7 +29,7 @@ final class ConfigParserTests: XCTestCase {
 
     func testDefaultLayoutTabs() {
         let cfg = AppConfig()
-        XCTAssertEqual(cfg.layout.tabs, ["home", "notes", "shelf", "terminal", "vpn"])
+        XCTAssertEqual(cfg.layout.tabs, ["home", "notes", "terminal", "holder", "vpn"])
     }
 
     func testDefaultShortcuts() {
