@@ -336,7 +336,7 @@ struct ExpandedView: View {
                     title: "Google Chat",
                     icon: "bubble.left.and.bubble.right.fill",
                     brandColor: Color(red: 0.0, green: 0.67, blue: 0.45),
-                    defaultURL: URL(string: "https://chat.google.com")!,
+                    defaultURL: URL(string: "https://accounts.google.com/AccountChooser?service=dynamite&Email=tanish.vashisth@cdadebate.com&continue=https://chat.google.com")!,
                     userAgent: WebTabItem.chromeUserAgent,
                     viewModel: viewModel
                 )

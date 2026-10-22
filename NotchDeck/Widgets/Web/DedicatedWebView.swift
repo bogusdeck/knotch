@@ -404,6 +404,11 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
         webView?.reload()
     }
 
+    func load(url: URL) {
+        currentURL = url
+        webView?.load(URLRequest(url: url))
+    }
+
     func goBack() {
         if let wv = webView, wv.canGoBack {
             wv.goBack()
@@ -503,6 +508,40 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
         completionHandler(.performDefaultHandling, nil)
     }
 
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+
+        // New window/tab requested (target="_blank" or window.open)
+        if navigationAction.targetFrame == nil {
+            let host = url.host?.lowercased() ?? ""
+            // Keep auth, login, account switchers, and in-service domains inside this web view
+            if host.contains("accounts.google.com") ||
+               host.contains("google.com") ||
+               host.contains("whatsapp.com") ||
+               host.contains("slack.com") ||
+               host.contains("cdadebate.com") ||
+               (!host.isEmpty && host == (currentURL.host?.lowercased() ?? "")) {
+                webView.load(navigationAction.request)
+                decisionHandler(.cancel)
+                return
+            } else {
+                // Open external links (e.g. shared articles) in user's default browser
+                NSWorkspace.shared.open(url)
+                decisionHandler(.cancel)
+                return
+            }
+        }
+
+        decisionHandler(.allow)
+    }
+
     // MARK: - WKUIDelegate (Permissions, File Chooser, Dialogs)
 
     func webView(
@@ -512,7 +551,17 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         if let targetURL = navigationAction.request.url {
-            // Open external popups in the user's default browser
+            let host = targetURL.host?.lowercased() ?? ""
+            if host.contains("accounts.google.com") ||
+               host.contains("google.com") ||
+               host.contains("whatsapp.com") ||
+               host.contains("slack.com") ||
+               host.contains("cdadebate.com") ||
+               (!host.isEmpty && host == (currentURL.host?.lowercased() ?? "")) {
+                webView.load(navigationAction.request)
+                return nil
+            }
+            // Open genuinely external URLs in the user's default browser
             NSWorkspace.shared.open(targetURL)
         }
         return nil
@@ -756,6 +805,37 @@ struct DedicatedWebView: View {
                 .pointingHandCursor()
                 .help(model.micStatus == .authorized ? "Microphone Access Granted" : (model.micStatus == .denied ? "Microphone Denied (Click to open System Settings)" : "Click to grant Microphone access"))
 
+                // Quick Switch to tanish.vashisth@cdadebate.com for Google Chat
+                if id == "googlechat" {
+                    Button {
+                        if let url = URL(string: "https://accounts.google.com/AccountChooser?service=dynamite&Email=tanish.vashisth@cdadebate.com&continue=https://chat.google.com") {
+                            model.load(url: url)
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "person.crop.circle.badge.checkmark")
+                                .font(.system(size: 9, weight: .bold))
+                            Text("tanish.vashisth@cdadebate.com")
+                                .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(Color(red: 0.0, green: 0.72, blue: 0.48))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color(red: 0.0, green: 0.72, blue: 0.48).opacity(0.12))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color(red: 0.0, green: 0.72, blue: 0.48).opacity(0.35), lineWidth: 0.75)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .pointingHandCursor()
+                    .help("Switch to tanish.vashisth@cdadebate.com")
+                }
+
                 // In-notch Zoom / Shrink Toggle Button
                 if let vm = viewModel {
                     Button {
@@ -786,6 +866,14 @@ struct DedicatedWebView: View {
 
                 // More Menu
                 Menu {
+                    if id == "googlechat" {
+                        Button("Sign in / Switch to tanish.vashisth@cdadebate.com") {
+                            if let url = URL(string: "https://accounts.google.com/AccountChooser?service=dynamite&Email=tanish.vashisth@cdadebate.com&continue=https://chat.google.com") {
+                                model.load(url: url)
+                            }
+                        }
+                        Divider()
+                    }
                     Button("Reload Page") { model.reload() }
                     Button("Request Microphone Permission") { model.requestMicrophoneAccess() }
                     Button("Microphone Privacy Settings") { model.openMicrophonePrivacySettings() }
