@@ -168,10 +168,11 @@ struct WebWidgetRepresentable: NSViewRepresentable {
         userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "notchBridge")
 
         let config = WKWebViewConfiguration()
+        config.processPool = WebKitShared.processPool
         config.userContentController = userContentController
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = FirstClickWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.underPageBackgroundColor = .clear
 

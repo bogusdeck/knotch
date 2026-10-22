@@ -8,7 +8,7 @@ import SwiftUI
 
 /// Which tab is shown in the expanded notch.
 enum NotchTab: String, CaseIterable {
-    case home, notes, shelf, terminal, holder, vpn
+    case home, notes, shelf, terminal, holder, vpn, web, whatsapp, slack
 }
 
 @MainActor
@@ -19,6 +19,7 @@ final class NotchViewModel: ObservableObject {
     @Published var state: NotchState = .collapsed
     @Published var activeTab: NotchTab = .home
     @Published var activeCustomTabId: String? = nil
+    @Published var isDraggingOverNotch: Bool = false
 
     /// In-notch settings mode state
     @Published var isSettingsActive: Bool = false
@@ -36,14 +37,24 @@ final class NotchViewModel: ObservableObject {
     /// Geometry is updated on screen-change notifications.
     @Published var geometry: NotchGeometry
 
+    /// Active unread WhatsApp notification count
+    @Published var whatsAppUnreadCount: Int = 0
+    var hasWhatsAppNotification: Bool {
+        whatsAppUnreadCount > 0
+    }
+
     /// Whether the terminal panel is expanded to enlarged full-size dimensions
     @Published var isTerminalZoomed: Bool = false
+
+    /// Whether the web browser panel is expanded to enlarged full-size dimensions
+    @Published var isWebZoomed: Bool = false
 
     /// Callbacks invoked when a view needs to trigger panel window expansion/collapse/peek
     var onExpandRequested: (@MainActor () -> Void)?
     var onCollapseRequested: (@MainActor () -> Void)?
     var onPeekRequested: (@MainActor () -> Void)?
     var onTerminalZoomToggled: (@MainActor () -> Void)?
+    var onWebZoomToggled: (@MainActor () -> Void)?
 
     func requestExpand() {
         onExpandRequested?()
@@ -60,6 +71,11 @@ final class NotchViewModel: ObservableObject {
     func toggleTerminalZoom() {
         isTerminalZoomed.toggle()
         onTerminalZoomToggled?()
+    }
+
+    func toggleWebZoom() {
+        isWebZoomed.toggle()
+        onWebZoomToggled?()
     }
 
     func openSettingsInsideNotch(category: SettingsCategory = .general) {

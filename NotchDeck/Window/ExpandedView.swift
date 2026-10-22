@@ -20,18 +20,26 @@ struct ExpandedView: View {
     @State private var isNotchHovered: Bool = false
     @State private var isExpandedDropTargeted: Bool = false
 
+    private var currentTheme: DeckTheme {
+        DeckTheme.current(
+            theme: configManager.config.appearance.theme,
+            accentHex: configManager.config.appearance.accent
+        )
+    }
+
     var body: some View {
+        let theme = currentTheme
         VStack(spacing: 0) {
             // Tab bar matching notch height
             tabBar
 
-            Divider().overlay(.white.opacity(0.1))
+            Divider().overlay(theme.divider)
 
             // Tab content
             tabContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(theme.primaryText)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onDrop(of: DropURLHelper.supportedDropTypes, isTargeted: $isExpandedDropTargeted) { providers in
             DropURLHelper.extractURLs(from: providers) { urls in
@@ -83,6 +91,14 @@ struct ExpandedView: View {
                 items.append(TabItemModel(id: "home", title: "Home", iconName: "square.grid.2x2", builtInTab: .home))
             case "notes":
                 items.append(TabItemModel(id: "notes", title: "Notes", iconName: "note.text", builtInTab: .notes))
+            case "whatsapp":
+                items.append(TabItemModel(id: "whatsapp", title: "WhatsApp", iconName: "message.fill", builtInTab: .whatsapp))
+            case "slack":
+                items.append(TabItemModel(id: "slack", title: "Slack", iconName: "number", builtInTab: .slack))
+            case "holder":
+                items.append(TabItemModel(id: "holder", title: "Holder", iconName: "macwindow.on.rectangle", builtInTab: .holder))
+            case "web", "browser":
+                items.append(TabItemModel(id: "web", title: "Web", iconName: "globe", builtInTab: .web))
             case "shelf":
                 items.append(TabItemModel(id: "shelf", title: "Shelf", iconName: "tray.2", builtInTab: .shelf))
             case "terminal":
@@ -91,7 +107,15 @@ struct ExpandedView: View {
                 items.append(TabItemModel(id: "vpn", title: "VPN", iconName: "lock.shield", builtInTab: .vpn))
             default:
                 if let widget = widgetRegistry.widget(id: tabId) {
-                    items.append(TabItemModel(id: widget.id, title: widget.title, iconName: "square.dashed", builtInTab: nil))
+                    let customIcon = configManager.config.widgets.first(where: { $0.id == tabId })?.icon ?? "square.dashed"
+                    items.append(TabItemModel(id: widget.id, title: widget.title, iconName: customIcon, builtInTab: nil))
+                } else if let widgetCfg = configManager.config.widgets.first(where: { $0.id == tabId }) {
+                    items.append(TabItemModel(
+                        id: widgetCfg.id,
+                        title: widgetCfg.title.isEmpty ? widgetCfg.id.capitalized : widgetCfg.title,
+                        iconName: widgetCfg.icon ?? "globe",
+                        builtInTab: nil
+                    ))
                 }
             }
         }
@@ -99,12 +123,12 @@ struct ExpandedView: View {
     }
 
     private var leftTabs: [TabItemModel] {
-        let split = min(3, allTabItems.count)
+        let split = (allTabItems.count + 1) / 2
         return Array(allTabItems.prefix(split))
     }
 
     private var rightTabs: [TabItemModel] {
-        let split = min(3, allTabItems.count)
+        let split = (allTabItems.count + 1) / 2
         return Array(allTabItems.dropFirst(split))
     }
 
@@ -114,15 +138,15 @@ struct ExpandedView: View {
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isNotchHovered ? Color.white.opacity(0.06) : Color.clear)
+                    .fill(isNotchHovered ? currentTheme.tabHover : Color.clear)
 
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.compact.up")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(isNotchHovered ? .white.opacity(0.7) : .white.opacity(0.35))
+                        .foregroundStyle(isNotchHovered ? currentTheme.primaryText.opacity(0.8) : currentTheme.secondaryText)
                     Text("notch")
                         .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(isNotchHovered ? .white.opacity(0.5) : .white.opacity(0.2))
+                        .foregroundStyle(isNotchHovered ? currentTheme.secondaryText : currentTheme.tertiaryText)
                 }
             }
             .frame(width: max(viewModel.geometry.notchFrame.width + 16, 175))
@@ -131,6 +155,7 @@ struct ExpandedView: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .pointingHandCursor()
         .onHover { hovering in
             isNotchHovered = hovering
         }
@@ -150,7 +175,7 @@ struct ExpandedView: View {
         HStack(spacing: 0) {
             // Left top corner: Settings button on the leftmost side + Left tabs (Home, Notes, Shelf)
             HStack(spacing: 5) {
-                SettingsButton {
+                SettingsButton(isLight: currentTheme.isLight) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         viewModel.isSettingsActive = true
                     }
@@ -182,7 +207,7 @@ struct ExpandedView: View {
         HStack(spacing: 0) {
             // Left top corner: Back button + Left settings category tabs
             HStack(spacing: 5) {
-                SettingsBackButton {
+                SettingsBackButton(isLight: currentTheme.isLight) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         viewModel.isSettingsActive = false
                     }
@@ -220,7 +245,7 @@ struct ExpandedView: View {
 
     private func settingsCategoryTabButton(_ category: SettingsCategory) -> some View {
         let isSelected = viewModel.selectedSettingsCategory == category
-        return SettingsCategoryTabButton(category: category, isSelected: isSelected) {
+        return SettingsCategoryTabButton(category: category, isSelected: isSelected, isLight: currentTheme.isLight) {
             withAnimation(.easeInOut(duration: 0.15)) {
                 viewModel.selectedSettingsCategory = category
             }
@@ -231,7 +256,7 @@ struct ExpandedView: View {
     private func renderTabButton(_ item: TabItemModel) -> some View {
         if let tab = item.builtInTab {
             if tab == .vpn, let vpnWidget = widgetRegistry.actionWidget(id: "vpn-status") ?? widgetRegistry.allActionWidgets.first(where: { $0.id.contains("vpn") }) {
-                VPNTopBarToggle(widget: vpnWidget, isSelected: false) {
+                VPNTopBarToggle(widget: vpnWidget, isSelected: false, isLight: currentTheme.isLight) {
                     // Single click = instant direct toggle without opening any card!
                     if let toggleBtn = vpnWidget.config.buttons.first(where: { $0.label.lowercased().contains("toggle") }) {
                         Task { await vpnWidget.executeButton(toggleBtn) }
@@ -244,7 +269,8 @@ struct ExpandedView: View {
             } else {
                 TabButton(
                     tab: tab,
-                    isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == tab
+                    isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == tab,
+                    isLight: currentTheme.isLight
                 ) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         viewModel.activeCustomTabId = nil
@@ -256,7 +282,8 @@ struct ExpandedView: View {
             CustomTabButton(
                 id: item.id,
                 title: item.title,
-                isSelected: viewModel.activeCustomTabId == item.id
+                isSelected: viewModel.activeCustomTabId == item.id,
+                isLight: currentTheme.isLight
             ) {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     viewModel.activeCustomTabId = item.id
@@ -277,6 +304,19 @@ struct ExpandedView: View {
         } else if let customId = viewModel.activeCustomTabId, let widget = widgetRegistry.widget(id: customId) {
             widget.expandedView()
                 .padding(10)
+        } else if let customId = viewModel.activeCustomTabId,
+                   let widgetCfg = configManager.config.widgets.first(where: { $0.id == customId && ($0.type == "web" || $0.url != nil) }),
+                   let urlString = widgetCfg.url ?? widgetCfg.path,
+                   let url = URL(string: urlString) {
+            DedicatedWebView(
+                id: customId,
+                title: widgetCfg.title.isEmpty ? customId.capitalized : widgetCfg.title,
+                icon: widgetCfg.icon ?? "globe",
+                brandColor: currentTheme.accent,
+                defaultURL: url,
+                userAgent: WebTabItem.userAgent(for: url),
+                viewModel: viewModel
+            )
         } else {
             switch viewModel.activeTab {
             case .home:
@@ -288,12 +328,34 @@ struct ExpandedView: View {
                 )
             case .notes:
                 NotesView(notesManager: notesManager, viewModel: viewModel)
+            case .whatsapp:
+                DedicatedWebView(
+                    id: "whatsapp",
+                    title: "WhatsApp",
+                    icon: "message.fill",
+                    brandColor: Color(red: 0.15, green: 0.78, blue: 0.42),
+                    defaultURL: URL(string: "https://web.whatsapp.com")!,
+                    userAgent: WebTabItem.chromeUserAgent,
+                    viewModel: viewModel
+                )
+            case .slack:
+                DedicatedWebView(
+                    id: "slack",
+                    title: "Slack",
+                    icon: "number",
+                    brandColor: Color(red: 0.88, green: 0.15, blue: 0.44),
+                    defaultURL: URL(string: "https://app.slack.com/client")!,
+                    userAgent: WebTabItem.chromeUserAgent,
+                    viewModel: viewModel
+                )
             case .shelf:
                 ShelfView(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop)
             case .terminal:
                 TerminalView(viewModel: viewModel)
             case .holder:
-                HolderView(holderManager: holderManager)
+                HolderView(holderManager: holderManager, viewModel: viewModel)
+            case .web:
+                WebDeckView(viewModel: viewModel)
             case .vpn:
                 if let actionWidget = widgetRegistry.actionWidget(id: "vpn-status") ?? widgetRegistry.allActionWidgets.first(where: { $0.id.contains("vpn") }) {
                     VPNView(widget: actionWidget)
@@ -313,31 +375,50 @@ struct ExpandedView: View {
 private struct TabButton: View {
     let tab: NotchTab
     let isSelected: Bool
+    var isLight: Bool = false
     let action: () -> Void
 
     @State private var isHovered: Bool = false
+
+    private var foregroundColor: Color {
+        if isSelected {
+            return isLight ? Color.black : .white
+        } else if isHovered {
+            return isLight ? Color.black.opacity(0.85) : .white.opacity(0.95)
+        } else {
+            return isLight ? Color.black.opacity(0.45) : .white.opacity(0.5)
+        }
+    }
+
+    private var backgroundColor: Color {
+        if isSelected {
+            return isLight ? Color.black.opacity(0.12) : Color.white.opacity(0.18)
+        } else if isHovered {
+            return isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.08)
+        } else {
+            return Color.clear
+        }
+    }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: tab.iconName)
                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.95) : .white.opacity(0.5)))
+                .foregroundStyle(foregroundColor)
                 .frame(width: 28, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 7)
-                        .fill(
-                            isSelected
-                                ? Color.white.opacity(0.18)
-                                : (isHovered ? Color.white.opacity(0.08) : Color.clear)
-                        )
+                        .fill(backgroundColor)
                 )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .pointingHandCursor()
         .onHover { hovering in
             isHovered = hovering
         }
+        .pointingHandCursor()
         .help(tab.displayName)
     }
 }
@@ -346,31 +427,50 @@ private struct CustomTabButton: View {
     let id: String
     let title: String
     let isSelected: Bool
+    var isLight: Bool = false
     let action: () -> Void
 
     @State private var isHovered: Bool = false
+
+    private var foregroundColor: Color {
+        if isSelected {
+            return isLight ? Color.black : .white
+        } else if isHovered {
+            return isLight ? Color.black.opacity(0.85) : .white.opacity(0.95)
+        } else {
+            return isLight ? Color.black.opacity(0.45) : .white.opacity(0.5)
+        }
+    }
+
+    private var backgroundColor: Color {
+        if isSelected {
+            return isLight ? Color.black.opacity(0.12) : Color.white.opacity(0.18)
+        } else if isHovered {
+            return isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.08)
+        } else {
+            return Color.clear
+        }
+    }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: "square.dashed")
                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.95) : .white.opacity(0.5)))
+                .foregroundStyle(foregroundColor)
                 .frame(width: 28, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 7)
-                        .fill(
-                            isSelected
-                                ? Color.white.opacity(0.18)
-                                : (isHovered ? Color.white.opacity(0.08) : Color.clear)
-                        )
+                        .fill(backgroundColor)
                 )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .pointingHandCursor()
         .onHover { hovering in
             isHovered = hovering
         }
+        .pointingHandCursor()
         .help(title)
     }
 }
@@ -378,6 +478,7 @@ private struct CustomTabButton: View {
 private struct VPNTopBarToggle: View {
     @ObservedObject var widget: ActionWidget
     let isSelected: Bool
+    var isLight: Bool = false
     let onToggle: () -> Void
     let onOpenTab: () -> Void
 
@@ -385,6 +486,26 @@ private struct VPNTopBarToggle: View {
 
     private var isConnected: Bool {
         widget.status == .active
+    }
+
+    private var foregroundColor: Color {
+        if isConnected {
+            return Color.green
+        } else if isHovered {
+            return isLight ? Color.black.opacity(0.85) : .white
+        } else {
+            return isLight ? Color.black.opacity(0.45) : .white.opacity(0.5)
+        }
+    }
+
+    private var backgroundColor: Color {
+        if isConnected {
+            return Color.green.opacity(0.18)
+        } else if isHovered {
+            return isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.08)
+        } else {
+            return Color.clear
+        }
     }
 
     var body: some View {
@@ -397,25 +518,23 @@ private struct VPNTopBarToggle: View {
                 } else {
                     Image(systemName: isConnected ? "lock.shield.fill" : "lock.shield")
                         .font(.system(size: 12, weight: isConnected ? .semibold : .regular))
-                        .foregroundStyle(isConnected ? Color.green : (isHovered ? .white : .white.opacity(0.5)))
+                        .foregroundStyle(foregroundColor)
                 }
             }
             .frame(width: 28, height: 26)
             .background(
                 RoundedRectangle(cornerRadius: 7)
-                    .fill(
-                        isConnected
-                            ? Color.green.opacity(0.18)
-                            : (isHovered ? Color.white.opacity(0.08) : Color.clear)
-                    )
+                    .fill(backgroundColor)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .pointingHandCursor()
         .onHover { hovering in
             isHovered = hovering
         }
+        .pointingHandCursor()
         .help(isConnected ? "VPN Connected (Click to disconnect)" : "VPN Disconnected (Click to connect)")
         .contextMenu {
             Button("Toggle VPN") {
@@ -429,6 +548,7 @@ private struct VPNTopBarToggle: View {
 }
 
 private struct SettingsButton: View {
+    var isLight: Bool = false
     let action: () -> Void
     @State private var isHovered: Bool = false
 
@@ -436,24 +556,27 @@ private struct SettingsButton: View {
         Button(action: action) {
             Image(systemName: "gearshape.fill")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isHovered ? .white : .white.opacity(0.65))
+                .foregroundStyle(isHovered ? (isLight ? Color.black : .white) : (isLight ? Color.black.opacity(0.55) : .white.opacity(0.65)))
                 .frame(width: 28, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 7)
-                        .fill(isHovered ? Color.white.opacity(0.16) : Color.white.opacity(0.06))
+                        .fill(isHovered ? (isLight ? Color.black.opacity(0.10) : Color.white.opacity(0.16)) : (isLight ? Color.black.opacity(0.04) : Color.white.opacity(0.06)))
                 )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .pointingHandCursor()
         .onHover { hovering in
             isHovered = hovering
         }
+        .pointingHandCursor()
         .help("Settings (⌘,)")
     }
 }
 
 private struct SettingsBackButton: View {
+    var isLight: Bool = false
     let action: () -> Void
     @State private var isHovered: Bool = false
 
@@ -461,19 +584,21 @@ private struct SettingsBackButton: View {
         Button(action: action) {
             Image(systemName: "chevron.left")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(isHovered ? .white : .white.opacity(0.85))
+                .foregroundStyle(isHovered ? (isLight ? Color.black : .white) : (isLight ? Color.black.opacity(0.7) : .white.opacity(0.85)))
                 .frame(width: 28, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 7)
-                        .fill(isHovered ? Color.white.opacity(0.18) : Color.white.opacity(0.08))
+                        .fill(isHovered ? (isLight ? Color.black.opacity(0.12) : Color.white.opacity(0.18)) : (isLight ? Color.black.opacity(0.05) : Color.white.opacity(0.08)))
                 )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .pointingHandCursor()
         .onHover { hovering in
             isHovered = hovering
         }
+        .pointingHandCursor()
         .help("Back to Dashboard (Esc)")
     }
 }
@@ -481,30 +606,49 @@ private struct SettingsBackButton: View {
 private struct SettingsCategoryTabButton: View {
     let category: SettingsCategory
     let isSelected: Bool
+    var isLight: Bool = false
     let action: () -> Void
     @State private var isHovered: Bool = false
+
+    private var foregroundColor: Color {
+        if isSelected {
+            return isLight ? Color.black : .white
+        } else if isHovered {
+            return isLight ? Color.black.opacity(0.85) : .white.opacity(0.95)
+        } else {
+            return isLight ? Color.black.opacity(0.45) : .white.opacity(0.5)
+        }
+    }
+
+    private var backgroundColor: Color {
+        if isSelected {
+            return isLight ? Color.black.opacity(0.12) : Color.white.opacity(0.18)
+        } else if isHovered {
+            return isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.08)
+        } else {
+            return Color.clear
+        }
+    }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: category.iconName)
                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : (isHovered ? .white.opacity(0.95) : .white.opacity(0.5)))
+                .foregroundStyle(foregroundColor)
                 .frame(width: 28, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 7)
-                        .fill(
-                            isSelected
-                                ? Color.white.opacity(0.18)
-                                : (isHovered ? Color.white.opacity(0.08) : Color.clear)
-                        )
+                        .fill(backgroundColor)
                 )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .pointingHandCursor()
         .onHover { hovering in
             isHovered = hovering
         }
+        .pointingHandCursor()
         .help(category.title)
     }
 }
@@ -516,10 +660,13 @@ extension NotchTab {
         switch self {
         case .home:     "Home"
         case .notes:    "Notes"
+        case .whatsapp: "WhatsApp"
+        case .slack:    "Slack"
         case .shelf:    "Shelf"
         case .terminal: "Terminal"
         case .holder:   "Holder"
         case .vpn:      "VPN"
+        case .web:      "Web"
         }
     }
 
@@ -527,10 +674,13 @@ extension NotchTab {
         switch self {
         case .home:     "square.grid.2x2"
         case .notes:    "note.text"
+        case .whatsapp: "message.fill"
+        case .slack:    "number"
         case .shelf:    "tray.2"
         case .terminal: "terminal"
         case .holder:   "macwindow.on.rectangle"
         case .vpn:      "lock.shield"
+        case .web:      "globe"
         }
     }
 }
@@ -543,81 +693,42 @@ struct HomeDashboardView: View {
     @ObservedObject var calendarManager: CalendarManager
     @ObservedObject var widgetRegistry: WidgetRegistry
 
-    private var isRAMWidgetEnabled: Bool {
-        configManager.config.layout.home.contains("ram") ||
-        configManager.config.layout.home.contains("memory") ||
-        configManager.config.layout.home.contains("ram-status")
-    }
-
-    private var isCPUWidgetEnabled: Bool {
-        configManager.config.layout.home.contains("cpu") ||
-        configManager.config.layout.home.contains("processor") ||
-        configManager.config.layout.home.contains("cpu-status") ||
-        configManager.config.layout.home.contains("processing")
-    }
-
-    private var isClockWidgetEnabled: Bool {
-        configManager.config.layout.home.contains("clock")
-    }
-
-    private var rightWidgetIds: [String] {
-        var ids: [String] = []
-        for id in configManager.config.layout.home {
-            if id == "ram" || id == "memory" || id == "ram-status" {
-                if !ids.contains("ram") { ids.append("ram") }
-            } else if id == "cpu" || id == "processor" || id == "cpu-status" || id == "processing" {
-                if !ids.contains("cpu") { ids.append("cpu") }
-            } else if id == "clock" {
-                if !ids.contains("clock") { ids.append("clock") }
-            }
+    private var activeHomeWidgets: [String] {
+        let items = configManager.config.layout.home
+        if items.isEmpty {
+            return ["media", "processor", "ram"]
         }
-        return ids
-    }
-
-    private var leftWidgetIds: [String] {
-        let items = configManager.config.layout.home.filter {
-            $0 != "clock" && $0 != "ram" && $0 != "memory" && $0 != "ram-status" &&
-            $0 != "cpu" && $0 != "processor" && $0 != "cpu-status" && $0 != "processing"
-        }
-        return items.isEmpty ? ["media"] : items
+        return items
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            // Left Column: Media Player, Calendar, other cards
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 12) {
-                    ForEach(leftWidgetIds, id: \.self) { widgetId in
+        Group {
+            if activeHomeWidgets.count <= 3 {
+                HStack(spacing: 10) {
+                    ForEach(activeHomeWidgets, id: \.self) { widgetId in
                         homeTile(for: widgetId)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
-                .padding(.vertical, 2)
-            }
-            .frame(maxWidth: .infinity)
-
-            // Right Column: RAM / CPU / Clock cards
-            if !rightWidgetIds.isEmpty {
+            } else {
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 10) {
-                        ForEach(rightWidgetIds, id: \.self) { rightId in
-                            switch rightId {
-                            case "ram":
-                                RAMStatusTile()
-                            case "cpu":
-                                CPUStatusTile()
-                            case "clock":
-                                ClockTile(calendarManager: calendarManager)
-                            default:
-                                EmptyView()
-                            }
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 10),
+                            GridItem(.flexible(), spacing: 10),
+                            GridItem(.flexible(), spacing: 10)
+                        ],
+                        spacing: 10
+                    ) {
+                        ForEach(activeHomeWidgets, id: \.self) { widgetId in
+                            homeTile(for: widgetId)
                         }
                     }
                     .padding(.vertical, 2)
                 }
-                .frame(width: 220)
             }
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -936,6 +1047,8 @@ private func getBatteryInfo() -> (level: Int, isCharging: Bool)? {
 // MARK: - RAM Status Tile
 
 struct RAMStatusTile: View {
+    @Environment(\.deckTheme) private var theme: DeckTheme
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1.5)) { _ in
             let mem = SystemStats.getMemoryInfo()
@@ -950,7 +1063,7 @@ struct RAMStatusTile: View {
 
                         Text("Memory (RAM)")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.65))
+                            .foregroundStyle(theme.secondaryText)
                     }
 
                     Spacer()
@@ -975,18 +1088,18 @@ struct RAMStatusTile: View {
                     HStack(alignment: .lastTextBaseline, spacing: 6) {
                         Text("\(Int(mem.usedPercentage))%")
                             .font(.system(size: 24, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(theme.primaryText)
 
                         Text("\(mem.usedFormatted) / \(mem.totalFormatted)")
                             .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(theme.secondaryText)
                     }
 
                     // Progress bar
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 3.5)
-                                .fill(Color.white.opacity(0.08))
+                                .fill(theme.barTrack)
                                 .frame(height: 5)
 
                             RoundedRectangle(cornerRadius: 3.5)
@@ -1005,7 +1118,7 @@ struct RAMStatusTile: View {
                 }
 
                 Divider()
-                    .overlay(Color.white.opacity(0.08))
+                    .overlay(theme.divider)
 
                 // Breakdown: App Memory, Wired, Available
                 VStack(spacing: 4) {
@@ -1014,12 +1127,12 @@ struct RAMStatusTile: View {
                             Circle().fill(Color.blue.opacity(0.8)).frame(width: 4, height: 4)
                             Text("App Memory")
                                 .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(theme.tertiaryText)
                         }
                         Spacer()
                         Text(mem.appFormatted)
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.75))
+                            .foregroundStyle(theme.secondaryText)
                     }
 
                     HStack {
@@ -1027,12 +1140,12 @@ struct RAMStatusTile: View {
                             Circle().fill(Color.orange.opacity(0.8)).frame(width: 4, height: 4)
                             Text("Wired Memory")
                                 .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(theme.tertiaryText)
                         }
                         Spacer()
                         Text(mem.wiredFormatted)
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.75))
+                            .foregroundStyle(theme.secondaryText)
                     }
 
                     HStack {
@@ -1040,22 +1153,24 @@ struct RAMStatusTile: View {
                             Circle().fill(Color.green.opacity(0.8)).frame(width: 4, height: 4)
                             Text("Available / Free")
                                 .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(theme.tertiaryText)
                         }
                         Spacer()
                         Text(mem.freeFormatted)
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.75))
+                            .foregroundStyle(theme.secondaryText)
                     }
                 }
+
+                Spacer(minLength: 0)
             }
             .padding(11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.05))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(theme.cardBackground)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(theme.cardBorder, lineWidth: 1)
             )
         }
     }
@@ -1064,6 +1179,8 @@ struct RAMStatusTile: View {
 // MARK: - CPU / Processor Status Tile
 
 struct CPUStatusTile: View {
+    @Environment(\.deckTheme) private var theme: DeckTheme
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1.5)) { _ in
             let cpu = SystemStats.getCPUInfo()
@@ -1078,7 +1195,7 @@ struct CPUStatusTile: View {
 
                         Text("Processor (CPU)")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.65))
+                            .foregroundStyle(theme.secondaryText)
                     }
 
                     Spacer()
@@ -1103,11 +1220,11 @@ struct CPUStatusTile: View {
                     HStack(alignment: .lastTextBaseline, spacing: 6) {
                         Text("\(Int(cpu.usagePercentage))%")
                             .font(.system(size: 24, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(theme.primaryText)
 
                         Text(cpu.brandSubtitle)
                             .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(theme.secondaryText)
                             .lineLimit(1)
                     }
 
@@ -1115,7 +1232,7 @@ struct CPUStatusTile: View {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 3.5)
-                                .fill(Color.white.opacity(0.08))
+                                .fill(theme.barTrack)
                                 .frame(height: 5)
 
                             RoundedRectangle(cornerRadius: 3.5)
@@ -1134,7 +1251,7 @@ struct CPUStatusTile: View {
                 }
 
                 Divider()
-                    .overlay(Color.white.opacity(0.08))
+                    .overlay(theme.divider)
 
                 // Breakdown: User Processes, System / Kernel, Idle
                 VStack(spacing: 4) {
@@ -1143,12 +1260,12 @@ struct CPUStatusTile: View {
                             Circle().fill(Color.cyan.opacity(0.8)).frame(width: 4, height: 4)
                             Text("User Processes")
                                 .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(theme.tertiaryText)
                         }
                         Spacer()
                         Text(cpu.userFormatted)
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.75))
+                            .foregroundStyle(theme.secondaryText)
                     }
 
                     HStack {
@@ -1156,12 +1273,12 @@ struct CPUStatusTile: View {
                             Circle().fill(Color.indigo.opacity(0.8)).frame(width: 4, height: 4)
                             Text("System / Kernel")
                                 .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(theme.tertiaryText)
                         }
                         Spacer()
                         Text(cpu.systemFormatted)
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.75))
+                            .foregroundStyle(theme.secondaryText)
                     }
 
                     HStack {
@@ -1169,22 +1286,24 @@ struct CPUStatusTile: View {
                             Circle().fill(Color.teal.opacity(0.8)).frame(width: 4, height: 4)
                             Text("Idle Capacity")
                                 .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(theme.tertiaryText)
                         }
                         Spacer()
                         Text(cpu.idleFormatted)
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.75))
+                            .foregroundStyle(theme.secondaryText)
                     }
                 }
+
+                Spacer(minLength: 0)
             }
             .padding(11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.05))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(theme.cardBackground)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(theme.cardBorder, lineWidth: 1)
             )
         }
     }
@@ -1194,6 +1313,7 @@ struct CPUStatusTile: View {
 
 struct ClockTile: View {
     @ObservedObject var calendarManager: CalendarManager
+    @Environment(\.deckTheme) private var theme: DeckTheme
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { timeline in
@@ -1210,7 +1330,7 @@ struct ClockTile: View {
 
                         Text(greeting(for: now))
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.65))
+                            .foregroundStyle(theme.secondaryText)
                     }
 
                     Spacer()
@@ -1219,15 +1339,15 @@ struct ClockTile: View {
                         HStack(spacing: 4) {
                             Image(systemName: b.isCharging ? "bolt.batteryblock.fill" : batteryIcon(for: b.level))
                                 .font(.system(size: 10))
-                                .foregroundStyle(b.isCharging ? Color.green : (b.level <= 20 ? Color.red : Color.white.opacity(0.6)))
+                                .foregroundStyle(b.isCharging ? Color.green : (b.level <= 20 ? Color.red : theme.secondaryText))
 
                             Text("\(b.level)%")
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.75))
+                                .foregroundStyle(theme.secondaryText)
                         }
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2.5)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
+                        .background(RoundedRectangle(cornerRadius: 6).fill(theme.inputBackground))
                     }
                 }
 
@@ -1236,15 +1356,15 @@ struct ClockTile: View {
                     Text(now, format: .dateTime.hour().minute().second())
                         .font(.system(size: 26, weight: .light, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.primaryText)
 
                     Text(now, format: .dateTime.weekday(.wide).day().month(.abbreviated).year())
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(theme.secondaryText)
                 }
 
                 Divider()
-                    .overlay(Color.white.opacity(0.08))
+                    .overlay(theme.divider)
 
                 // Schedule snapshot: next event or calendar indicator
                 if let nextEvent = calendarManager.events.first {
@@ -1256,39 +1376,41 @@ struct ClockTile: View {
 
                             Text("Upcoming")
                                 .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.45))
+                                .foregroundStyle(theme.tertiaryText)
                                 .textCase(.uppercase)
                         }
 
                         Text(nextEvent.title)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(theme.primaryText)
                             .lineLimit(1)
 
                         Text(nextEvent.timeString)
                             .font(.system(size: 9))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(theme.secondaryText)
                     }
                 } else {
                     HStack(spacing: 6) {
                         Image(systemName: "calendar")
                             .font(.system(size: 10))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(theme.tertiaryText)
 
                         Text("No upcoming events")
                             .font(.system(size: 10))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(theme.tertiaryText)
                     }
                     .padding(.vertical, 2)
                 }
+
+                Spacer(minLength: 0)
             }
             .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.05))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(theme.cardBackground)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(theme.cardBorder, lineWidth: 1)
             )
         }
     }
@@ -1332,17 +1454,19 @@ private struct TerminalPlaceholderView: View {
 }
 
 private struct VPNPlaceholderView: View {
+    @Environment(\.deckTheme) private var theme: DeckTheme
+
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: "lock.shield")
                 .font(.system(size: 24))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(theme.tertiaryText)
             Text("No VPN action widget defined in config.toml")
                 .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(theme.secondaryText)
             Text("Add an action widget with id = 'vpn-status' in config.toml")
                 .font(.system(size: 9))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(theme.tertiaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -1359,6 +1483,7 @@ private func placeholderLabel(_ text: String) -> some View {
 
 struct VPNView: View {
     @ObservedObject var widget: ActionWidget
+    @Environment(\.deckTheme) private var theme: DeckTheme
 
     var isConnected: Bool {
         widget.status == .active
@@ -1396,18 +1521,18 @@ struct VPNView: View {
             VStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(isConnected ? Color.green.opacity(0.15) : Color.white.opacity(0.06))
+                        .fill(isConnected ? Color.green.opacity(0.15) : theme.inputBackground)
                         .frame(width: 68, height: 68)
 
                     Image(systemName: isConnected ? "lock.shield.fill" : "lock.shield")
                         .font(.system(size: 32, weight: .semibold))
-                        .foregroundStyle(isConnected ? Color.green : Color.white.opacity(0.45))
+                        .foregroundStyle(isConnected ? Color.green : theme.secondaryText)
                 }
 
                 VStack(spacing: 2) {
                     Text(isConnected ? "Connected" : (widget.status == .checking ? "Connecting…" : "Disconnected"))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(isConnected ? Color.green : (widget.status == .checking ? Color.orange : Color.white.opacity(0.6)))
+                        .foregroundStyle(isConnected ? Color.green : (widget.status == .checking ? Color.orange : theme.secondaryText))
 
                     if isConnected {
                         Text("Protected")
@@ -1416,14 +1541,14 @@ struct VPNView: View {
                     } else {
                         Text("Unprotected")
                             .font(.system(size: 10))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(theme.tertiaryText)
                     }
                 }
             }
             .frame(width: 120)
 
             Divider()
-                .overlay(Color.white.opacity(0.1))
+                .overlay(theme.divider)
                 .frame(height: 110)
 
             // Right: Info & Controls
@@ -1431,7 +1556,7 @@ struct VPNView: View {
                 HStack {
                     Text("VPN")
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.primaryText)
 
                     Spacer()
 
@@ -1441,9 +1566,9 @@ struct VPNView: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(theme.secondaryText)
                             .padding(6)
-                            .background(Circle().fill(Color.white.opacity(0.06)))
+                            .background(Circle().fill(theme.inputBackground))
                     }
                     .buttonStyle(.plain)
                     .help("Refresh VPN status")
@@ -1455,28 +1580,28 @@ struct VPNView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "network")
                                 .font(.system(size: 10))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(theme.secondaryText)
                             Text(ip)
                                 .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.85))
+                                .foregroundStyle(theme.primaryText)
                         }
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
+                        .background(RoundedRectangle(cornerRadius: 6).fill(theme.inputBackground))
                     }
 
                     if let fw = parsedFirewall {
                         HStack(spacing: 5) {
                             Image(systemName: "flame.fill")
                                 .font(.system(size: 10))
-                                .foregroundStyle(fw.lowercased() == "on" ? Color.orange : Color.white.opacity(0.4))
+                                .foregroundStyle(fw.lowercased() == "on" ? Color.orange : theme.tertiaryText)
                             Text("Firewall: \(fw)")
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.75))
+                                .foregroundStyle(theme.secondaryText)
                         }
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
+                        .background(RoundedRectangle(cornerRadius: 6).fill(theme.inputBackground))
                     }
                 }
 

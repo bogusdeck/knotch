@@ -18,16 +18,18 @@ struct NotchShape: Shape {
     }
 
     private var stateValue: Double
+    private var customExpandedRadius: CGFloat
 
-    init(hasNotch: Bool, state: NotchState) {
-        self.hasNotch   = hasNotch
-        self.state      = state
-        self.stateValue = state.animatableValue
+    init(hasNotch: Bool, state: NotchState, cornerRadius: CGFloat = 22) {
+        self.hasNotch             = hasNotch
+        self.state                = state
+        self.stateValue           = state.animatableValue
+        self.customExpandedRadius = cornerRadius
     }
 
     func path(in rect: CGRect) -> Path {
         // Interpolate corner radius based on state value
-        let radius = lerp(from: collapsedRadius, to: expandedRadius, t: stateValue)
+        let radius = lerp(from: collapsedRadius, to: customExpandedRadius, t: stateValue)
         let concaveR: CGFloat = hasNotch ? 8 : 0   // concave side corners on notch Macs
 
         switch hasNotch {
@@ -41,7 +43,7 @@ struct NotchShape: Shape {
     // MARK: - Radii
 
     private var collapsedRadius: CGFloat { hasNotch ? 12 : 12 }
-    private var expandedRadius:  CGFloat { 22 }
+    private var expandedRadius:  CGFloat { customExpandedRadius }
 
     // MARK: - Path builders
 

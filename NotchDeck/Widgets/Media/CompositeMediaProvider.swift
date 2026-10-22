@@ -36,20 +36,20 @@ final class CompositeMediaProvider: MediaProvider {
         case .mediaRemote:
             return mediaRemoteProvider.isAvailable ? mediaRemoteProvider : appleScriptProvider
         case .auto:
-            // MediaRemote is preferred if it has media playing
-            if mediaRemoteProvider.isAvailable, let remoteMedia = mediaRemoteProvider.currentMedia, remoteMedia.isPlaying {
-                return mediaRemoteProvider
-            }
-            // AppleScript if playing
+            // Spotify or Apple Music if playing has highest fidelity metadata
             if let scriptMedia = appleScriptProvider.currentMedia, scriptMedia.isPlaying {
                 return appleScriptProvider
             }
-            // If neither is playing, pick whichever has current media
-            if mediaRemoteProvider.isAvailable, mediaRemoteProvider.currentMedia != nil {
+            // MediaRemote if it has media actively playing
+            if mediaRemoteProvider.isAvailable, let remoteMedia = mediaRemoteProvider.currentMedia, remoteMedia.isPlaying {
                 return mediaRemoteProvider
             }
+            // If neither is playing, pick whichever has current media (prefer AppleScript for Spotify/Music)
             if appleScriptProvider.currentMedia != nil {
                 return appleScriptProvider
+            }
+            if mediaRemoteProvider.isAvailable, mediaRemoteProvider.currentMedia != nil {
+                return mediaRemoteProvider
             }
             return mediaRemoteProvider.isAvailable ? mediaRemoteProvider : appleScriptProvider
         }
@@ -65,6 +65,8 @@ final class CompositeMediaProvider: MediaProvider {
         appleScriptProvider.startObserving { [weak self] _ in
             self?.updateCurrentMedia()
         }
+
+        updateCurrentMedia()
     }
 
     func stopObserving() {

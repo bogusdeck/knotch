@@ -40,5 +40,15 @@
     <string>NotchDeck displays upcoming calendar events in the notch hub.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>NotchDeck displays upcoming calendar events in the notch hub.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>NotchDeck controls media playback for Spotify and Music in the notch.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>NotchDeck requires camera access for video conferencing and calls in web apps like WhatsApp and Slack.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>NotchDeck requires microphone access for voice messages and calls in web apps like WhatsApp and Slack.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>NotchDeck uses your location for location-based web services.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>NotchDeck connects with external FIDO2 / Passkey security authenticators via Bluetooth.</string>
 </dict>
 </plist>

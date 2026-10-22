@@ -110,7 +110,7 @@ final class MediaRemoteMediaProvider: MediaProvider {
             while !Task.isCancelled {
                 await self?.queryNowPlaying()
                 let isPlaying = self?.currentMedia?.isPlaying ?? false
-                let delay = isPlaying ? 1_000_000_000 : 2_000_000_000
+                let delay = isPlaying ? 2_000_000_000 : 8_000_000_000
                 try? await Task.sleep(nanoseconds: UInt64(delay))
             }
         }

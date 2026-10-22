@@ -43,6 +43,7 @@ struct AppearanceConfig: Sendable, Equatable {
     var expandedWidth: Int = 640
     var expandedHeight: Int = 260
     var cornerRadius: Int = 22
+    var dynamicSizing: Bool = false
 
     static let `default` = AppearanceConfig()
 }
@@ -50,7 +51,7 @@ struct AppearanceConfig: Sendable, Equatable {
 // MARK: - Layout
 
 struct LayoutConfig: Sendable, Equatable {
-    var tabs: [String] = ["home", "notes", "terminal", "holder", "vpn"]
+    var tabs: [String] = ["home", "notes", "whatsapp", "slack", "web", "terminal", "vpn"]
     var home: [String] = ["media", "clock", "calendar", "vpn-status"]
 
     static let `default` = LayoutConfig()
@@ -80,6 +81,7 @@ struct WidgetConfig: Sendable, Equatable {
     var intervalS: Int = 30
 
     // For web widgets
+    var url: String? = nil
     var path: String? = nil
     var allowShell: Bool = false
 

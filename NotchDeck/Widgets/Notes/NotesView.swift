@@ -8,6 +8,7 @@ struct NotesView: View {
 
     @ObservedObject var notesManager: NotesManager
     @ObservedObject var viewModel: NotchViewModel
+    @Environment(\.deckTheme) private var theme: DeckTheme
 
     @State private var quickText: String = ""
     @FocusState private var isInputFocused: Bool
@@ -49,7 +50,7 @@ struct NotesView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Image(systemName: "square.and.pencil")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(theme.accent)
                     .imageScale(.medium)
 
                 TextField("Take a quick note...", text: $quickText, axis: .vertical)
@@ -76,25 +77,26 @@ struct NotesView: View {
                             .font(.system(size: 11, weight: .semibold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(Color.purple.opacity(0.8))
+                            .background(theme.accent)
                             .foregroundStyle(.white)
                             .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                 }
             }
             .padding(10)
-            .background(Color.white.opacity(0.06))
+            .background(theme.cardBackground)
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(isInputFocused ? Color.purple.opacity(0.6) : Color.white.opacity(0.1), lineWidth: 1)
+                    .stroke(isInputFocused ? theme.accent.opacity(0.6) : theme.cardBorder, lineWidth: 1)
             )
 
             HStack {
                 Text("⏎ to save • ⇧⏎ for newline • Esc to close")
                     .font(.system(size: 9))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(theme.tertiaryText)
                 Spacer()
             }
             .padding(.horizontal, 4)
@@ -114,7 +116,7 @@ struct NotesView: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .imageScale(.small)
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(theme.tertiaryText)
 
             TextField("Search notes...", text: $notesManager.searchQuery)
                 .textFieldStyle(.plain)
@@ -126,14 +128,15 @@ struct NotesView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .imageScale(.small)
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(theme.tertiaryText)
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(Color.white.opacity(0.04))
+        .background(theme.inputBackground)
         .cornerRadius(6)
     }
 
@@ -166,6 +169,7 @@ struct NotesView: View {
                     .imageScale(.small)
             }
             .buttonStyle(.plain)
+            .pointingHandCursor()
             .padding(.top, 2)
 
             // Content snippet
@@ -173,20 +177,20 @@ struct NotesView: View {
                 HStack {
                     Text(note.title)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.primaryText)
                         .lineLimit(1)
 
                     Spacer()
 
                     Text(note.createdAt, style: .date)
                         .font(.system(size: 9))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(theme.tertiaryText)
                 }
 
                 if !note.preview.isEmpty {
                     Text(note.preview)
                         .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.65))
+                        .foregroundStyle(theme.secondaryText)
                         .lineLimit(2)
                 }
             }
@@ -207,9 +211,10 @@ struct NotesView: View {
                     } label: {
                         Image(systemName: copiedNoteId == note.id ? "checkmark" : "doc.on.doc")
                             .imageScale(.small)
-                            .foregroundStyle(copiedNoteId == note.id ? .green : .white.opacity(0.6))
+                            .foregroundStyle(copiedNoteId == note.id ? .green : theme.secondaryText)
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                     .help("Copy content")
 
                     // Open in default editor
@@ -218,9 +223,10 @@ struct NotesView: View {
                     } label: {
                         Image(systemName: "arrow.up.forward.square")
                             .imageScale(.small)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(theme.secondaryText)
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                     .help("Open in default editor")
 
                     // Delete
@@ -232,6 +238,7 @@ struct NotesView: View {
                             .foregroundStyle(.red.opacity(0.8))
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                     .help("Delete note")
                 }
                 .transition(.opacity)
@@ -240,11 +247,11 @@ struct NotesView: View {
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(note.isPinned ? Color.yellow.opacity(0.08) : Color.white.opacity(0.04))
+                .fill(note.isPinned ? Color.yellow.opacity(0.12) : theme.cardBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(note.isPinned ? Color.yellow.opacity(0.2) : Color.clear, lineWidth: 1)
+                .stroke(note.isPinned ? Color.yellow.opacity(0.3) : theme.cardBorder, lineWidth: 1)
         )
         .onHover { isHovered in
             withAnimation(.easeInOut(duration: 0.15)) {
@@ -275,14 +282,14 @@ struct NotesView: View {
         VStack(spacing: 6) {
             Image(systemName: "note.text")
                 .imageScale(.large)
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(theme.tertiaryText)
                 .padding(.top, 16)
             Text(notesManager.searchQuery.isEmpty ? "No notes yet" : "No matching notes")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(theme.secondaryText)
             Text("Notes are saved to ~/.config/notchdeck/notes/")
                 .font(.system(size: 9))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(theme.tertiaryText)
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.vertical, 16)

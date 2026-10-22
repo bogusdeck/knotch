@@ -76,6 +76,9 @@ struct NotchSettingsContentView: View {
         .onReceive(configManager.$config) { _ in
             syncFromConfigManager()
         }
+        .onChange(of: draftConfig.appearance) { _, newAppearance in
+            configManager.updateAppearanceLive(newAppearance)
+        }
     }
 
     private func syncFromConfigManager() {
@@ -206,11 +209,12 @@ struct NotchSettingsContentView: View {
                         Spacer()
                         Picker("", selection: $draftConfig.appearance.theme) {
                             Text("Dark (HUD)").tag("dark")
-                            Text("Light").tag("light")
+                            Text("Light (Frosted)").tag("light")
+                            Text("System Match").tag("auto")
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .frame(width: 140)
+                        .frame(width: 150)
                     }
 
                     Divider().overlay(Color.white.opacity(0.08))
@@ -238,38 +242,71 @@ struct NotchSettingsContentView: View {
 
             SettingsCard(title: "Notch Dimensions", icon: "aspectratio") {
                 VStack(spacing: 10) {
-                    HStack {
-                        Text("Expanded Width")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                        Spacer()
-                        Slider(value: Binding(
-                            get: { Double(draftConfig.appearance.expandedWidth) },
-                            set: { draftConfig.appearance.expandedWidth = Int($0) }
-                        ), in: 480...1200, step: 10)
-                        .frame(width: 160)
-                        Text("\(draftConfig.appearance.expandedWidth) pt")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .frame(width: 60, alignment: .trailing)
+                    Toggle(isOn: $draftConfig.appearance.dynamicSizing) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Dynamic Section Dimensions")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.9))
+                            Text("Adapts notch width and height dynamically based on each tab's content")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
                     }
+                    .toggleStyle(.switch)
 
-                    Divider().overlay(Color.white.opacity(0.08))
+                    if draftConfig.appearance.dynamicSizing {
+                        Divider().overlay(Color.white.opacity(0.08))
 
-                    HStack {
-                        Text("Expanded Height")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                        Spacer()
-                        Slider(value: Binding(
-                            get: { Double(draftConfig.appearance.expandedHeight) },
-                            set: { draftConfig.appearance.expandedHeight = Int($0) }
-                        ), in: 180...600, step: 10)
-                        .frame(width: 160)
-                        Text("\(draftConfig.appearance.expandedHeight) pt")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .frame(width: 60, alignment: .trailing)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Tailored size per section:")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.5))
+
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                                tabSizeBadge(label: "Home", size: "640 × 260")
+                                tabSizeBadge(label: "Terminal", size: "720 × 380")
+                                tabSizeBadge(label: "Notes", size: "680 × 380")
+                                tabSizeBadge(label: "Holder", size: "660 × 330")
+                                tabSizeBadge(label: "VPN", size: "540 × 230")
+                                tabSizeBadge(label: "Settings", size: "660 × 420")
+                            }
+                        }
+                    } else {
+                        Divider().overlay(Color.white.opacity(0.08))
+
+                        HStack {
+                            Text("Expanded Width")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.8))
+                            Spacer()
+                            Slider(value: Binding(
+                                get: { Double(draftConfig.appearance.expandedWidth) },
+                                set: { draftConfig.appearance.expandedWidth = Int($0) }
+                            ), in: 480...1200, step: 10)
+                            .frame(width: 160)
+                            Text("\(draftConfig.appearance.expandedWidth) pt")
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .frame(width: 60, alignment: .trailing)
+                        }
+
+                        Divider().overlay(Color.white.opacity(0.08))
+
+                        HStack {
+                            Text("Expanded Height")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.8))
+                            Spacer()
+                            Slider(value: Binding(
+                                get: { Double(draftConfig.appearance.expandedHeight) },
+                                set: { draftConfig.appearance.expandedHeight = Int($0) }
+                            ), in: 180...600, step: 10)
+                            .frame(width: 160)
+                            Text("\(draftConfig.appearance.expandedHeight) pt")
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .frame(width: 60, alignment: .trailing)
+                        }
                     }
 
                     Divider().overlay(Color.white.opacity(0.08))
@@ -294,6 +331,22 @@ struct NotchSettingsContentView: View {
 
             saveActionBar
         }
+    }
+
+    private func tabSizeBadge(label: String, size: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+            Spacer()
+            Text(size)
+                .font(.system(size: 9.5, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.55))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.06))
+        .cornerRadius(6)
     }
 
     // MARK: - Shortcuts Section
@@ -379,19 +432,127 @@ struct NotchSettingsContentView: View {
                 }
             }
 
-            SettingsCard(title: "Home Widgets", icon: "square.grid.2x2") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Widgets embedded in the Home dashboard:")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.5))
-                    HStack(spacing: 6) {
-                        ForEach(draftConfig.layout.home, id: \.self) { widgetName in
-                            Text(widgetName)
-                                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
+            SettingsCard(title: "Home Dashboard Cards", icon: "square.grid.2x2") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Active Cards (\(draftConfig.layout.home.count))")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.9))
+                            Text("Cards are displayed side-by-side as square tiles on Home")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+
+                        Spacer()
+
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                draftConfig.layout.home = ["media", "cpu", "ram"]
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 10))
+                                Text("3 Square Cards")
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .help("Quickly preset to Media + CPU + RAM 3-card square layout")
+                    }
+
+                    // Currently active chips with ordering & removal
+                    if draftConfig.layout.home.isEmpty {
+                        Text("No cards active. Please enable at least one card below.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.orange.opacity(0.8))
+                    } else {
+                        HStack(spacing: 6) {
+                            ForEach(Array(draftConfig.layout.home.enumerated()), id: \.offset) { index, widgetName in
+                                HStack(spacing: 4) {
+                                    Text("\(index + 1).")
+                                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(Color.accentColor)
+
+                                    Text(widgetDisplayName(for: widgetName))
+                                        .font(.system(size: 10.5, weight: .medium))
+                                        .foregroundStyle(.white)
+
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.15)) {
+                                            draftConfig.layout.home.removeAll { $0 == widgetName }
+                                        }
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.white.opacity(0.4))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3.5)
                                 .background(Color.white.opacity(0.12))
                                 .cornerRadius(6)
+                            }
+                        }
+                    }
+
+                    Divider().overlay(Color.white.opacity(0.08))
+
+                    Text("Toggle Available Cards:")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+
+                    // List of available widgets
+                    VStack(spacing: 6) {
+                        ForEach(availableHomeWidgetOptions) { option in
+                            let isEnabled = draftConfig.layout.home.contains(option.id) ||
+                                (option.id == "cpu" && (draftConfig.layout.home.contains("processor") || draftConfig.layout.home.contains("cpu-status") || draftConfig.layout.home.contains("processing"))) ||
+                                (option.id == "ram" && (draftConfig.layout.home.contains("memory") || draftConfig.layout.home.contains("ram-status")))
+
+                            HStack {
+                                Image(systemName: option.icon)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(isEnabled ? Color.accentColor : Color.white.opacity(0.4))
+                                    .frame(width: 18)
+
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(option.name)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.white.opacity(isEnabled ? 0.95 : 0.6))
+                                    Text(option.description)
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                }
+
+                                Spacer()
+
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        if isEnabled {
+                                            draftConfig.layout.home.removeAll { id in
+                                                id == option.id ||
+                                                (option.id == "cpu" && (id == "processor" || id == "cpu-status" || id == "processing")) ||
+                                                (option.id == "ram" && (id == "memory" || id == "ram-status"))
+                                            }
+                                        } else {
+                                            draftConfig.layout.home.append(option.id)
+                                        }
+                                    }
+                                } label: {
+                                    Text(isEnabled ? "Active" : "+ Add")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(isEnabled ? Color.white : Color.white.opacity(0.7))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 2.5)
+                                        .background(isEnabled ? Color.accentColor : Color.white.opacity(0.1))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.vertical, 2)
                         }
                     }
                 }
@@ -647,24 +808,6 @@ private struct SettingsCard<Content: View>: View {
     }
 }
 
-// MARK: - Color Hex Extension
-
-private extension Color {
-    init?(hex: String) {
-        var cleanHex = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cleanHex.hasPrefix("#") {
-            cleanHex.removeFirst()
-        }
-        guard cleanHex.count == 6, let rgbValue = UInt64(cleanHex, radix: 16) else {
-            return nil
-        }
-        let r = Double((rgbValue & 0xFF0000) >> 16) / 255.0
-        let g = Double((rgbValue & 0x00FF00) >> 8) / 255.0
-        let b = Double(rgbValue & 0x0000FF) / 255.0
-        self.init(.sRGB, red: r, green: g, blue: b, opacity: 1.0)
-    }
-}
-
 // MARK: - Standalone Window Wrapper
 
 struct SettingsView: View {
@@ -706,3 +849,34 @@ struct SettingsView: View {
         .background(Color(NSColor.windowBackgroundColor))
     }
 }
+
+// MARK: - Home Widget Options
+
+struct HomeWidgetOption: Identifiable, Sendable {
+    let id: String
+    let name: String
+    let icon: String
+    let description: String
+}
+
+private let availableHomeWidgetOptions: [HomeWidgetOption] = [
+    HomeWidgetOption(id: "media", name: "Media Player", icon: "opticaldisc", description: "Spotify / Music playback & Vinyl mode"),
+    HomeWidgetOption(id: "cpu", name: "Processor (CPU)", icon: "cpu", description: "Live CPU usage %, cores, load stats"),
+    HomeWidgetOption(id: "ram", name: "Memory (RAM)", icon: "memorychip", description: "RAM usage %, pressure & breakdown"),
+    HomeWidgetOption(id: "clock", name: "Clock & Date", icon: "clock", description: "Digital clock, date & battery info"),
+    HomeWidgetOption(id: "calendar", name: "Calendar", icon: "calendar", description: "Next upcoming event & schedule"),
+    HomeWidgetOption(id: "vpn", name: "VPN Status", icon: "lock.shield", description: "VPN tunnel status & quick toggle")
+]
+
+private func widgetDisplayName(for id: String) -> String {
+    switch id {
+    case "media": return "Media"
+    case "cpu", "processor", "cpu-status", "processing": return "Processor"
+    case "ram", "memory", "ram-status": return "Memory"
+    case "clock": return "Clock"
+    case "calendar": return "Calendar"
+    case "vpn", "vpn-status": return "VPN"
+    default: return id
+    }
+}
+

@@ -46,6 +46,7 @@ struct NotchRootView: View {
             handleDrop(providers: providers)
         }
         .onChange(of: isDragHoveringNotch) { _, isHovering in
+            viewModel.isDraggingOverNotch = isHovering
             if isHovering {
                 if viewModel.state != .expanded {
                     viewModel.requestExpand()
@@ -63,22 +64,81 @@ struct NotchRootView: View {
             return .handled
         }
         .animation(.spring(response: 0.36, dampingFraction: 0.82), value: viewModel.state)
+        .environment(\.deckTheme, currentTheme)
     }
 
     // MARK: - Background shape
 
-    private var notchBackground: some View {
-        NotchShape(
-            hasNotch: viewModel.geometry.hasNotch,
-            state: viewModel.state
+    private var currentTheme: DeckTheme {
+        DeckTheme.current(
+            theme: configManager.config.appearance.theme,
+            accentHex: configManager.config.appearance.accent
         )
-        .fill(.black)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if viewModel.state == .collapsed || viewModel.state == .peek {
-                viewModel.requestExpand()
+    }
+
+    private var notchBackground: some View {
+        let cornerR = CGFloat(configManager.config.appearance.cornerRadius)
+        let theme = currentTheme
+        let isCollapsed = viewModel.state == .collapsed
+        let isCollapsedNotch = viewModel.geometry.hasNotch && isCollapsed
+        let showWhatsAppGlow = viewModel.hasWhatsAppNotification && isCollapsed
+        let showBorder = !isCollapsed
+        let borderStrokeColor = theme.isLight ? theme.outerBorder : Color.white.opacity(0.12)
+        let shadowColor = !isCollapsed ? Color.black.opacity(0.42) : Color.clear
+        let notchW = viewModel.geometry.notchFrame.width
+        let notchH = viewModel.geometry.notchFrame.height
+        let collapsedW = showWhatsAppGlow ? notchW + 10 : notchW
+        let collapsedH = showWhatsAppGlow ? notchH + 4 : notchH
+
+        return ZStack(alignment: .top) {
+            if showWhatsAppGlow {
+                // WhatsApp Notification: Pure Electric Green Pill (Zero black fill outside the notch)
+                NotchShape(
+                    hasNotch: viewModel.geometry.hasNotch,
+                    state: viewModel.state,
+                    cornerRadius: 15
+                )
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.15, green: 0.83, blue: 0.45),
+                            Color(red: 0.22, green: 0.98, blue: 0.52),
+                            Color(red: 0.15, green: 0.83, blue: 0.45)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: Color(red: 0.15, green: 0.83, blue: 0.45).opacity(0.95), radius: 6, x: 0, y: 2)
+                .shadow(color: Color(red: 0.22, green: 0.98, blue: 0.52).opacity(0.6), radius: 10, x: 0, y: 2)
+                .frame(
+                    width: isCollapsedNotch ? collapsedW : nil,
+                    height: isCollapsedNotch ? collapsedH : nil
+                )
+            } else {
+                NotchShape(
+                    hasNotch: viewModel.geometry.hasNotch,
+                    state: viewModel.state,
+                    cornerRadius: cornerR
+                )
+                .fill(isCollapsedNotch ? Color.black : theme.background)
+                .frame(
+                    width: isCollapsedNotch ? collapsedW : nil,
+                    height: isCollapsedNotch ? collapsedH : nil
+                )
+            }
+
+            if showBorder {
+                NotchShape(
+                    hasNotch: viewModel.geometry.hasNotch,
+                    state: viewModel.state,
+                    cornerRadius: cornerR
+                )
+                .stroke(borderStrokeColor, lineWidth: 1)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .shadow(color: shadowColor, radius: 18, y: 8)
         .ignoresSafeArea()
     }
 
@@ -86,24 +146,10 @@ struct NotchRootView: View {
 
     @ViewBuilder
     private var contentLayer: some View {
-        switch viewModel.state {
-        case .collapsed:
-            collapsedView
-                .transition(.opacity)
-
-        case .peek:
-            PeekView(viewModel: viewModel, mediaManager: mediaManager)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    viewModel.requestExpand()
-                }
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top)),
-                    removal: .opacity
-                ))
-
-        case .expanded:
+        ZStack(alignment: .top) {
+            // Keep ExpandedView mounted in the window hierarchy so that WebKit audio
+            // (Spotify, YouTube, web media) and active sessions (WhatsApp, Slack)
+            // NEVER get paused or disconnected when the notch collapses!
             ExpandedView(
                 viewModel: viewModel,
                 configManager: configManager,
@@ -114,10 +160,29 @@ struct NotchRootView: View {
                 calendarManager: calendarManager,
                 widgetRegistry: widgetRegistry
             )
-            .transition(.asymmetric(
-                insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .top)),
-                removal: .opacity
-            ))
+            .opacity(viewModel.state == .expanded ? 1 : 0)
+            .allowsHitTesting(viewModel.state == .expanded)
+            .frame(
+                width: viewModel.state == .expanded ? nil : 0,
+                height: viewModel.state == .expanded ? nil : 0
+            )
+            .clipped()
+
+            if viewModel.state == .collapsed {
+                collapsedView
+                    .transition(.opacity)
+            } else if viewModel.state == .peek {
+                PeekView(viewModel: viewModel, mediaManager: mediaManager)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        viewModel.requestExpand()
+                    }
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top)),
+                        removal: .opacity
+                    ))
+            }
         }
     }
 
@@ -141,6 +206,23 @@ struct NotchRootView: View {
                         .transition(.opacity)
                 }
 
+                if viewModel.hasWhatsAppNotification {
+                    HStack(spacing: 3) {
+                        Image(systemName: "message.fill")
+                            .font(.system(size: 8.5, weight: .bold))
+                            .foregroundStyle(.white)
+                        if viewModel.whatsAppUnreadCount > 0 {
+                            Text("\(viewModel.whatsAppUnreadCount)")
+                                .font(.system(size: 8, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1.5)
+                    .background(Capsule().fill(Color.black.opacity(0.3)))
+                    .transition(.scale.combined(with: .opacity))
+                }
+
                 Spacer()
 
                 if let media = mediaManager.currentMedia, media.isPlaying {
@@ -148,12 +230,35 @@ struct NotchRootView: View {
                         .transition(.opacity)
                 }
             }
+            .frame(height: viewModel.geometry.notchFrame.height)
             .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {
             viewModel.requestExpand()
+        }
+        .contextMenu {
+            if viewModel.hasWhatsAppNotification {
+                Button("Clear WhatsApp Notification") {
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.8)) {
+                        viewModel.whatsAppUnreadCount = 0
+                    }
+                    NotificationCenter.default.post(name: .whatsAppUnreadCountChanged, object: nil, userInfo: ["count": 0])
+                }
+            } else {
+                Button("Simulate WhatsApp Notification (Test Glow)") {
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.8)) {
+                        viewModel.whatsAppUnreadCount = 1
+                    }
+                    NotificationCenter.default.post(name: .whatsAppUnreadCountChanged, object: nil, userInfo: ["count": 1])
+                }
+            }
+            Divider()
+            Button("Expand Notch") {
+                viewModel.requestExpand()
+            }
         }
     }
 
@@ -167,10 +272,22 @@ struct NotchRootView: View {
                     .scaledToFill()
                     .frame(width: 14, height: 14)
                     .cornerRadius(3)
+            } else if let urlStr = media.artworkUrl, let url = URL(string: urlStr) {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Image(systemName: "music.note")
+                            .font(.system(size: 9))
+                            .foregroundStyle(media.brandColor)
+                    }
+                }
+                .frame(width: 14, height: 14)
+                .cornerRadius(3)
             } else {
                 Image(systemName: "music.note")
                     .font(.system(size: 9))
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(media.brandColor)
             }
 
             AudioWaveView(isPlaying: true, color: .purple)

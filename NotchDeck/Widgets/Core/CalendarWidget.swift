@@ -5,6 +5,7 @@ import SwiftUI
 
 struct CalendarWidgetTile: View {
     @ObservedObject var calendarManager: CalendarManager
+    @Environment(\.deckTheme) private var theme: DeckTheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -15,7 +16,7 @@ struct CalendarWidgetTile: View {
 
                 Text("Upcoming Events")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.primaryText)
 
                 Spacer()
             }
@@ -24,7 +25,7 @@ struct CalendarWidgetTile: View {
                 if calendarManager.events.isEmpty {
                     Text("No upcoming events")
                         .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(theme.tertiaryText)
                         .padding(.vertical, 4)
                 } else {
                     VStack(spacing: 6) {
@@ -36,14 +37,14 @@ struct CalendarWidgetTile: View {
 
                                 Text(event.title)
                                     .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(theme.primaryText)
                                     .lineLimit(1)
 
                                 Spacer()
 
                                 Text(event.timeString)
                                     .font(.system(size: 9))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(theme.secondaryText)
                             }
                         }
                     }
@@ -52,7 +53,7 @@ struct CalendarWidgetTile: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Calendar access is required to display your upcoming schedule.")
                         .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(theme.secondaryText)
 
                     Button("Grant Calendar Permission") {
                         calendarManager.requestPermission()
@@ -63,13 +64,16 @@ struct CalendarWidgetTile: View {
                 }
                 .padding(.vertical, 4)
             }
+
+            Spacer(minLength: 0)
         }
         .padding(12)
-        .background(Color.white.opacity(0.05))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(theme.cardBackground)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(theme.cardBorder, lineWidth: 1)
         )
     }
 }

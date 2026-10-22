@@ -8,7 +8,7 @@ import SwiftUI
 struct TerminalView: View {
     @ObservedObject var manager = TerminalManager.shared
     var viewModel: NotchViewModel? = nil
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.deckTheme) private var theme: DeckTheme
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +19,7 @@ struct TerminalView: View {
                 .padding(.bottom, 6)
 
             Divider()
-                .opacity(0.3)
+                .overlay(theme.divider)
 
             // Active terminal view
             if let active = manager.activeSession {
@@ -32,10 +32,10 @@ struct TerminalView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "terminal")
                         .font(.system(size: 28))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(theme.tertiaryText)
                     Text("No active terminal sessions")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -57,9 +57,9 @@ struct TerminalView: View {
                     } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                             .padding(6)
-                            .background(Color.white.opacity(0.08))
+                            .background(theme.inputBackground)
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
@@ -80,9 +80,9 @@ struct TerminalView: View {
                         } label: {
                             Image(systemName: vm.isTerminalZoomed ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(vm.isTerminalZoomed ? .white : .secondary)
+                                .foregroundStyle(vm.isTerminalZoomed ? theme.primaryText : theme.secondaryText)
                                 .frame(width: 24, height: 22)
-                                .background(vm.isTerminalZoomed ? Color.white.opacity(0.22) : Color.white.opacity(0.08))
+                                .background(vm.isTerminalZoomed ? theme.tabSelected : theme.inputBackground)
                                 .clipShape(RoundedRectangle(cornerRadius: 5))
                         }
                         .buttonStyle(.plain)
@@ -95,9 +95,9 @@ struct TerminalView: View {
                         } label: {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(theme.secondaryText)
                                 .padding(4)
-                                .background(Color.white.opacity(0.06))
+                                .background(theme.inputBackground)
                                 .clipShape(RoundedRectangle(cornerRadius: 5))
                         }
                         .buttonStyle(.plain)
@@ -108,9 +108,9 @@ struct TerminalView: View {
                         } label: {
                             Image(systemName: "stop.fill")
                                 .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(.red.opacity(0.85))
+                                .foregroundStyle(.red.opacity(0.85))
                                 .padding(4)
-                                .background(Color.white.opacity(0.06))
+                                .background(theme.inputBackground)
                                 .clipShape(RoundedRectangle(cornerRadius: 5))
                         }
                         .buttonStyle(.plain)
@@ -121,9 +121,9 @@ struct TerminalView: View {
                         } label: {
                             Image(systemName: "play.fill")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.green)
+                                .foregroundStyle(.green)
                                 .padding(4)
-                                .background(Color.white.opacity(0.06))
+                                .background(theme.inputBackground)
                                 .clipShape(RoundedRectangle(cornerRadius: 5))
                         }
                         .buttonStyle(.plain)
@@ -148,7 +148,7 @@ struct TerminalView: View {
 
                 Text(session.title)
                     .font(.system(size: 11, weight: isSelected ? .medium : .regular))
-                    .foregroundColor(isSelected ? .primary : .secondary)
+                    .foregroundStyle(isSelected ? theme.primaryText : theme.secondaryText)
 
                 if session.id != "default" {
                     Button {
@@ -156,14 +156,14 @@ struct TerminalView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.secondary.opacity(0.7))
+                            .foregroundStyle(theme.secondaryText)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(isSelected ? Color.white.opacity(0.12) : Color.white.opacity(0.04))
+            .background(isSelected ? theme.tabSelected : theme.inputBackground)
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)

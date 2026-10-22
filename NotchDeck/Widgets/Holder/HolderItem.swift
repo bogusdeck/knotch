@@ -66,6 +66,73 @@ struct HolderItem: Identifiable, Codable, Sendable, Equatable {
     var isPDF: Bool {
         kind == .pdf || path.lowercased().hasSuffix(".pdf")
     }
+    var webCompanionURL: URL? {
+        let lower = name.lowercased()
+        if lower.contains("whatsapp") {
+            return URL(string: "https://web.whatsapp.com")
+        }
+        if lower.contains("spotify") {
+            return URL(string: "https://open.spotify.com")
+        }
+        if lower.contains("chatgpt") {
+            return URL(string: "https://chatgpt.com")
+        }
+        if lower.contains("claude") {
+            return URL(string: "https://claude.ai")
+        }
+        if lower.contains("notion") {
+            return URL(string: "https://www.notion.so")
+        }
+        if lower.contains("discord") {
+            return URL(string: "https://discord.com/app")
+        }
+        if lower.contains("slack") {
+            return URL(string: "https://slack.com/signin")
+        }
+        if lower.contains("telegram") {
+            return URL(string: "https://web.telegram.org/a/")
+        }
+        if lower.contains("twitter") || lower == "x" {
+            return URL(string: "https://x.com")
+        }
+        if lower.contains("youtube") {
+            return URL(string: "https://www.youtube.com")
+        }
+        if lower.contains("github") {
+            return URL(string: "https://github.com")
+        }
+        if lower.contains("linear") {
+            return URL(string: "https://linear.app")
+        }
+        if lower.contains("figma") {
+            return URL(string: "https://www.figma.com")
+        }
+        if lower.contains("reddit") {
+            return URL(string: "https://www.reddit.com")
+        }
+        if lower.contains("gmail") {
+            return URL(string: "https://mail.google.com")
+        }
+        if lower.contains("calendar") {
+            return URL(string: "https://calendar.google.com")
+        }
+        if lower.contains("jira") {
+            return URL(string: "https://jira.atlassian.com")
+        }
+        if lower.contains("asana") {
+            return URL(string: "https://app.asana.com")
+        }
+        if lower.contains("trello") {
+            return URL(string: "https://trello.com")
+        }
+        if lower.contains("teams") {
+            return URL(string: "https://teams.microsoft.com")
+        }
+        if lower.contains("zoom") {
+            return URL(string: "https://zoom.us")
+        }
+        return nil
+    }
 
     var isRunning: Bool {
         guard isApplication else { return false }

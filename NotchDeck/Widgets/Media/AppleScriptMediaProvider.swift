@@ -15,6 +15,8 @@ final class AppleScriptMediaProvider: MediaProvider {
 
     private var pollTimer: Task<Void, Never>?
     private var onChangeCallback: (@MainActor (MediaItem?) -> Void)?
+    private var artworkCache: [String: Data] = [:]
+    private var fetchingArtworks: Set<String> = []
 
     // MARK: - Observation
 
@@ -113,13 +115,21 @@ final class AppleScriptMediaProvider: MediaProvider {
         let script = """
         if application "Spotify" is running then
             tell application "Spotify"
-                set pState to player state as string
-                set tName to name of current track
-                set tArtist to artist of current track
-                set tAlbum to album of current track
-                set tDuration to (duration of current track) / 1000
-                set tPosition to player position
-                return pState & "|||" & tName & "|||" & tArtist & "|||" & tAlbum & "|||" & tDuration & "|||" & tPosition
+                try
+                    set pState to player state as string
+                    set tName to name of current track
+                    set tArtist to artist of current track
+                    set tAlbum to album of current track
+                    set tDuration to (duration of current track) / 1000
+                    set tPosition to player position
+                    set tArtUrl to ""
+                    try
+                        set tArtUrl to artwork url of current track
+                    end try
+                    return pState & "|||" & tName & "|||" & tArtist & "|||" & tAlbum & "|||" & tDuration & "|||" & tPosition & "|||" & tArtUrl
+                on error
+                    return ""
+                end try
             end tell
         else
             return ""
@@ -139,6 +149,17 @@ final class AppleScriptMediaProvider: MediaProvider {
         let album = parts[3]
         let duration = Double(parts[4]) ?? 0.0
         let position = Double(parts[5]) ?? 0.0
+        let rawArtUrl = parts.count >= 7 ? parts[6].trimmingCharacters(in: .whitespacesAndNewlines) : nil
+        let artUrl = (rawArtUrl?.isEmpty ?? true) ? nil : rawArtUrl
+
+        var cachedData: Data? = nil
+        if let artUrl {
+            if let cached = artworkCache[artUrl] {
+                cachedData = cached
+            } else {
+                prefetchArtwork(for: artUrl)
+            }
+        }
 
         return MediaItem(
             title: name,
@@ -148,21 +169,47 @@ final class AppleScriptMediaProvider: MediaProvider {
             elapsedTime: position,
             isPlaying: (state == "playing"),
             bundleIdentifier: "com.spotify.client",
-            artworkData: nil
+            artworkData: cachedData,
+            artworkUrl: artUrl
         )
+    }
+
+    private func prefetchArtwork(for urlString: String) {
+        guard !fetchingArtworks.contains(urlString), let url = URL(string: urlString) else { return }
+        fetchingArtworks.insert(urlString)
+        Task { [weak self] in
+            guard let (data, response) = try? await URLSession.shared.data(from: url),
+                  (response as? HTTPURLResponse)?.statusCode == 200 else {
+                self?.fetchingArtworks.remove(urlString)
+                return
+            }
+            guard let self else { return }
+            self.fetchingArtworks.remove(urlString)
+            self.artworkCache[urlString] = data
+            if self.currentMedia?.artworkUrl == urlString {
+                if var current = self.currentMedia {
+                    current.artworkData = data
+                    self.updateItem(current)
+                }
+            }
+        }
     }
 
     private func queryAppleMusic() async -> MediaItem? {
         let script = """
         if application "Music" is running then
             tell application "Music"
-                set pState to player state as string
-                set tName to name of current track
-                set tArtist to artist of current track
-                set tAlbum to album of current track
-                set tDuration to duration of current track
-                set tPosition to player position
-                return pState & "|||" & tName & "|||" & tArtist & "|||" & tAlbum & "|||" & tDuration & "|||" & tPosition
+                try
+                    set pState to player state as string
+                    set tName to name of current track
+                    set tArtist to artist of current track
+                    set tAlbum to album of current track
+                    set tDuration to duration of current track
+                    set tPosition to player position
+                    return pState & "|||" & tName & "|||" & tArtist & "|||" & tAlbum & "|||" & tDuration & "|||" & tPosition
+                on error
+                    return ""
+                end try
             end tell
         else
             return ""
@@ -191,7 +238,8 @@ final class AppleScriptMediaProvider: MediaProvider {
             elapsedTime: position,
             isPlaying: (state == "playing"),
             bundleIdentifier: "com.apple.Music",
-            artworkData: nil
+            artworkData: nil,
+            artworkUrl: nil
         )
     }
 

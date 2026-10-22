@@ -6,6 +6,7 @@ import AppKit
 import Combine
 import OSLog
 import SwiftUI
+import WebKit
 
 private let logger = Logger(subsystem: "com.notchdeck.app", category: "PanelController")
 
@@ -18,7 +19,7 @@ final class NotchPanelController: NSObject {
     private var hostingView: NSHostingView<NotchRootView>?
     let viewModel: NotchViewModel
     private let configManager: ConfigManager
-    private var geometry: NotchGeometry
+    var geometry: NotchGeometry
 
     /// Tracks the hover tracking area for peek behaviour.
     private var hoverTrackingArea: NSTrackingArea?
@@ -28,6 +29,12 @@ final class NotchPanelController: NSObject {
 
     /// Cancellables for config observers
     private var cancellables = Set<AnyCancellable>()
+
+    /// Global event monitor to collapse the notch when clicking anywhere outside
+    private var outsideClickMonitor: Any?
+
+    /// Previous frontmost application stored before expanding so we can restore focus upon collapse
+    private var previousFrontmostApp: NSRunningApplication?
 
     let notesManager = NotesManager()
     let shelfManager = ShelfManager()
@@ -70,6 +77,13 @@ final class NotchPanelController: NSObject {
             }
         }
 
+        viewModel.onWebZoomToggled = { [weak self] in
+            guard let self = self else { return }
+            if self.viewModel.state == .expanded {
+                self.resizePanel(for: .expanded, animated: true)
+            }
+        }
+
         viewModel.$activeTab
             .dropFirst()
             .receive(on: DispatchQueue.main)
@@ -77,12 +91,33 @@ final class NotchPanelController: NSObject {
                 guard let self = self else { return }
                 if self.viewModel.isTerminalZoomed && newTab != .terminal {
                     self.viewModel.isTerminalZoomed = false
-                    if self.viewModel.state == .expanded {
-                        self.resizePanel(for: .expanded, animated: true)
-                    }
+                }
+                if self.viewModel.isWebZoomed && newTab != .web {
+                    self.viewModel.isWebZoomed = false
+                }
+                if self.viewModel.state == .expanded {
+                    self.resizePanel(for: .expanded, animated: true)
                 }
             }
             .store(in: &cancellables)
+
+        viewModel.$isSettingsActive
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                if self.viewModel.state == .expanded {
+                    self.resizePanel(for: .expanded, animated: true)
+                }
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWhatsAppUnreadChanged(_:)),
+            name: .whatsAppUnreadCountChanged,
+            object: nil
+        )
 
         observeConfig()
     }
@@ -110,6 +145,26 @@ final class NotchPanelController: NSObject {
                 }
             }
             .store(in: &cancellables)
+
+        holderManager.$activeEmbeddedAppItem
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if self.viewModel.state == .expanded && self.viewModel.activeTab == .holder {
+                    self.resizePanel(for: .expanded, animated: true)
+                }
+            }
+            .store(in: &cancellables)
+
+        viewModel.$activeTab
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if self.viewModel.state == .expanded && self.configManager.config.appearance.dynamicSizing {
+                    self.resizePanel(for: .expanded, animated: true)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Show
@@ -126,12 +181,14 @@ final class NotchPanelController: NSObject {
             widgetRegistry: widgetRegistry
         )
         let hostingView = NotchHostingView(rootView: rootView)
+        hostingView.panelController = self
         hostingView.layer?.backgroundColor = .clear
 
         hostingView.onDragEntered = { [weak self] in
             guard let self else { return }
             logger.info("Drag entered NotchPanel!")
             self.peekTimer?.cancel()
+            self.viewModel.isDraggingOverNotch = true
             if self.viewModel.state != .expanded {
                 self.expand()
             }
@@ -140,9 +197,15 @@ final class NotchPanelController: NSObject {
             }
         }
 
+        hostingView.onDragExited = { [weak self] in
+            guard let self else { return }
+            self.viewModel.isDraggingOverNotch = false
+        }
+
         hostingView.onPerformDrag = { [weak self] sender in
             guard let self else { return false }
             let urls = self.extractURLsFromPasteboard(sender.draggingPasteboard)
+            self.viewModel.isDraggingOverNotch = false
             guard !urls.isEmpty else { return false }
             for url in urls {
                 self.holderManager.addItem(from: url)
@@ -159,11 +222,40 @@ final class NotchPanelController: NSObject {
         // Set the hosting view
         panel.contentView = hostingView
         self.hostingView  = hostingView
-
         positionPanel()
         panel.orderFrontRegardless()
         installHoverTracking()
         observeScreenChanges()
+
+        // Start Dock drag monitoring so drags from the macOS Dock are sensed as they approach the notch
+        DockDragMonitor.shared.onDragApproachingNotch = { [weak self] url, name in
+            guard let self else { return }
+            self.viewModel.isDraggingOverNotch = true
+            if self.viewModel.state != .expanded {
+                self.expand()
+            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                self.viewModel.activeTab = .holder
+            }
+        }
+
+        DockDragMonitor.shared.onDragDroppedOnNotch = { [weak self] url in
+            guard let self else { return }
+            self.viewModel.isDraggingOverNotch = false
+            if let url {
+                self.holderManager.addItem(from: url)
+            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                self.viewModel.activeTab = .holder
+            }
+        }
+
+        DockDragMonitor.shared.onDragCancelled = { [weak self] in
+            guard let self else { return }
+            self.viewModel.isDraggingOverNotch = false
+        }
+
+        DockDragMonitor.shared.start()
 
         logger.info("NotchPanel shown at \(self.panel.frame.debugDescription)")
     }
@@ -173,27 +265,69 @@ final class NotchPanelController: NSObject {
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL], !urls.isEmpty {
             results.append(contentsOf: urls)
         }
-        if results.isEmpty, let filenames = pb.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String] {
+
+        let dockType = NSPasteboard.PasteboardType("com.apple.dock.item")
+        if let dockPlist = (pb.propertyList(forType: dockType) as? [String: Any]) ??
+           (pb.data(forType: dockType).flatMap { (try? PropertyListSerialization.propertyList(from: $0, format: nil)) as? [String: Any] }) {
+            results.append(contentsOf: extractURLsFromDockPlist(dockPlist))
+        }
+
+        if let filenames = pb.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String] {
             for name in filenames {
                 results.append(URL(fileURLWithPath: name))
             }
         }
-        if results.isEmpty, let string = pb.string(forType: .string) {
+        if let string = pb.string(forType: .string) {
             if string.hasPrefix("file://"), let url = URL(string: string) {
                 results.append(url)
             } else if FileManager.default.fileExists(atPath: string) {
                 results.append(URL(fileURLWithPath: string))
             }
         }
-        if results.isEmpty, let items = pb.pasteboardItems {
+        if let items = pb.pasteboardItems {
             for item in items {
+                if let dockPlist = (item.propertyList(forType: dockType) as? [String: Any]) ??
+                   (item.data(forType: dockType).flatMap { (try? PropertyListSerialization.propertyList(from: $0, format: nil)) as? [String: Any] }) {
+                    results.append(contentsOf: extractURLsFromDockPlist(dockPlist))
+                }
                 if let str = item.string(forType: .fileURL) ?? item.string(forType: NSPasteboard.PasteboardType("public.file-url")),
                    let url = URL(string: str) {
                     results.append(url)
                 }
             }
         }
-        return results
+        var unique: [URL] = []
+        for u in results {
+            if !unique.contains(u) {
+                unique.append(u)
+            }
+        }
+        return unique
+    }
+
+    private func extractURLsFromDockPlist(_ dict: [String: Any]) -> [URL] {
+        var found: [URL] = []
+        let target = (dict["tile-data"] as? [String: Any]) ?? dict
+
+        if let fileData = target["file-data"] as? [String: Any],
+           let urlString = fileData["_CFURLString"] as? String,
+           let url = URL(string: urlString) {
+            found.append(url)
+        }
+        if let bundleId = target["bundle-identifier"] as? String,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            found.append(appURL)
+        }
+        if let label = target["file-label"] as? String {
+            let appURL = URL(fileURLWithPath: "/Applications/\(label).app")
+            let sysURL = URL(fileURLWithPath: "/System/Applications/\(label).app")
+            if FileManager.default.fileExists(atPath: appURL.path) {
+                found.append(appURL)
+            } else if FileManager.default.fileExists(atPath: sysURL.path) {
+                found.append(sysURL)
+            }
+        }
+        return found
     }
 
     // MARK: - Positioning
@@ -217,12 +351,31 @@ final class NotchPanelController: NSObject {
     func expand() {
         logger.debug("→ expanded")
         peekTimer?.cancel()
+        if viewModel.hasWhatsAppNotification {
+            viewModel.activeTab = .whatsapp
+            viewModel.activeCustomTabId = nil
+        }
+
+        // Remember the currently frontmost app so we can cleanly return focus when collapsed
+        if let frontApp = NSWorkspace.shared.frontmostApplication,
+           frontApp.bundleIdentifier != Bundle.main.bundleIdentifier {
+            previousFrontmostApp = frontApp
+        }
+
         withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
             viewModel.state = .expanded
         }
         resizePanel(for: .expanded, animated: true)
-        // Panel must become key so text fields work
+
+        // Treat NotchDeck as a full-fledged foreground application when expanded:
+        // Switching to .regular activation policy gives NotchDeck genuine application focus,
+        // isolating drawer interactions from background windows and ensuring WebKit maintains full document.hasFocus().
+        NSApp.setActivationPolicy(.regular)
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        startOutsideClickMonitor()
     }
 
     func openSettings(category: SettingsCategory = .general) {
@@ -233,16 +386,26 @@ final class NotchPanelController: NSObject {
     func collapse() {
         logger.debug("→ collapsed")
         peekTimer?.cancel()
+        stopOutsideClickMonitor()
+
         withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
             viewModel.state = .collapsed
             viewModel.isSettingsActive = false
             viewModel.isTerminalZoomed = false
+            viewModel.isWebZoomed = false
         }
         resizePanel(for: .collapsed, animated: true)
+
+        // Revert to accessory mode when collapsed so it hides from Dock/switcher
+        NSApp.setActivationPolicy(.accessory)
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
+
         // Return focus to whichever app was previously active
-        if let app = NSWorkspace.shared.frontmostApplication {
+        if let app = previousFrontmostApp ?? NSWorkspace.shared.frontmostApplication,
+           app.bundleIdentifier != Bundle.main.bundleIdentifier {
             app.activate(options: [])
         }
+        previousFrontmostApp = nil
     }
 
     func peek() {
@@ -283,7 +446,9 @@ final class NotchPanelController: NSObject {
                 ctx.allowsImplicitAnimation = true
                 panel.animator().setFrame(targetFrame, display: true)
             } completionHandler: { [weak self] in
-                self?.installHoverTracking()
+                Task { @MainActor [weak self] in
+                    self?.installHoverTracking()
+                }
             }
         } else {
             panel.setFrame(targetFrame, display: true)
@@ -295,6 +460,17 @@ final class NotchPanelController: NSObject {
         let cfg = configManager.config.appearance
         switch state {
         case .collapsed:
+            if viewModel.hasWhatsAppNotification {
+                // Expand 10pt wider (5pt left & right) and 4pt taller (4pt bottom) so it peeks out around the physical notch
+                let w = geometry.notchFrame.width + 10
+                let h = geometry.notchFrame.height + 4
+                return CGRect(
+                    x: geometry.notchFrame.midX - w / 2,
+                    y: geometry.notchFrame.maxY - h,
+                    width: w,
+                    height: h
+                )
+            }
             return geometry.notchFrame
 
         case .peek:
@@ -316,6 +492,29 @@ final class NotchPanelController: NSObject {
                 let maxH = (screen?.visibleFrame.height ?? 800) * 0.78
                 w = min(maxW, 1040)
                 h = min(maxH, 620)
+            } else if holderManager.activeEmbeddedAppItem != nil && viewModel.activeTab == .holder {
+                let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
+                let maxW = (screen?.visibleFrame.width ?? 1200) * 0.92
+                let maxH = (screen?.visibleFrame.height ?? 800) * 0.82
+                w = min(maxW, 980)
+                h = min(maxH, 640)
+            } else if viewModel.activeTab == .web {
+                let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
+                if viewModel.isWebZoomed {
+                    let maxW = (screen?.visibleFrame.width ?? 1200) * 0.94
+                    let maxH = (screen?.visibleFrame.height ?? 800) * 0.88
+                    w = min(maxW, 1180)
+                    h = min(maxH, 760)
+                } else {
+                    let maxW = (screen?.visibleFrame.width ?? 1200) * 0.82
+                    let maxH = (screen?.visibleFrame.height ?? 800) * 0.68
+                    w = min(maxW, 860)
+                    h = min(maxH, 520)
+                }
+            } else if cfg.dynamicSizing {
+                let (dynW, dynH) = dynamicDimensions(for: viewModel.activeTab, isSettings: viewModel.isSettingsActive)
+                w = dynW
+                h = dynH
             } else {
                 w = CGFloat(cfg.expandedWidth)
                 h = CGFloat(cfg.expandedHeight)
@@ -326,6 +525,40 @@ final class NotchPanelController: NSObject {
                 width: w,
                 height: h
             )
+        }
+    }
+
+    private func dynamicDimensions(for tab: NotchTab, isSettings: Bool) -> (CGFloat, CGFloat) {
+        if isSettings {
+            return (660, 420)
+        }
+        if viewModel.activeCustomTabId != nil {
+            return (640, 300)
+        }
+        if tab == .holder && holderManager.activeEmbeddedAppItem != nil {
+            let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
+            let maxW = (screen?.visibleFrame.width ?? 1200) * 0.92
+            let maxH = (screen?.visibleFrame.height ?? 800) * 0.82
+            return (min(maxW, 980), min(maxH, 640))
+        }
+        switch tab {
+        case .home:
+            return (680, 245)
+        case .notes:
+            return (680, 380)
+        case .terminal:
+            return (720, 380)
+        case .holder:
+            return (660, 330)
+        case .vpn:
+            return (540, 230)
+        case .shelf:
+            return (620, 260)
+        case .web, .whatsapp, .slack:
+            let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
+            let maxW = (screen?.visibleFrame.width ?? 1200) * 0.92
+            let maxH = (screen?.visibleFrame.height ?? 800) * 0.82
+            return (min(maxW, 980), min(maxH, 640))
         }
     }
 
@@ -343,6 +576,7 @@ final class NotchPanelController: NSObject {
         )
         contentView.addTrackingArea(area)
         hoverTrackingArea = area
+        panel.invalidateCursorRects(for: contentView)
     }
 
     // MARK: - Screen change notifications
@@ -363,13 +597,33 @@ final class NotchPanelController: NSObject {
             positionPanel()
         }
     }
+
+    // MARK: - WhatsApp Notification Glow & Pill Expansion
+
+    @objc private func handleWhatsAppUnreadChanged(_ notification: Notification) {
+        let count = notification.userInfo?["count"] as? Int ?? 0
+        Task { @MainActor in
+            withAnimation(.spring(response: 0.36, dampingFraction: 0.8)) {
+                self.viewModel.whatsAppUnreadCount = count
+            }
+            if self.viewModel.state == .collapsed {
+                self.resizePanel(for: .collapsed, animated: true)
+            }
+        }
+    }
+}
+
+extension Notification.Name {
+    static let whatsAppUnreadCountChanged = Notification.Name("NotchDeckWhatsAppUnreadCountChanged")
 }
 
 // MARK: - NSTrackingArea hover callbacks
 
 extension NotchPanelController {
 
+    @objc(mouseEntered:)
     func mouseEntered(with event: NSEvent) {
+        NSCursor.arrow.set()
         // Always cancel any pending collapse timer if mouse is back inside
         peekTimer?.cancel()
         handleHoverEnter()
@@ -377,6 +631,11 @@ extension NotchPanelController {
 
     func handleHoverEnter() {
         guard viewModel.state == .collapsed else { return }
+        if geometry.hasNotch {
+            if !geometry.notchFrame.contains(NSEvent.mouseLocation) {
+                return
+            }
+        }
         let delayMs = min(configManager.config.general.peekDelayMs, 60)
         peekTimer?.cancel()
         peekTimer = Task {
@@ -390,6 +649,7 @@ extension NotchPanelController {
         }
     }
 
+    @objc(mouseExited:)
     func mouseExited(with event: NSEvent) {
         handleHoverExit()
     }
@@ -411,18 +671,79 @@ extension NotchPanelController {
             }
         }
     }
+
+    // MARK: - Outside click monitoring
+
+    private func startOutsideClickMonitor() {
+        guard outsideClickMonitor == nil else { return }
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                guard self.viewModel.state == .expanded else { return }
+                let mouseLoc = NSEvent.mouseLocation
+                // Only collapse if the click occurred strictly outside the expanded notch panel frame
+                if !self.panel.frame.contains(mouseLoc) {
+                    self.collapse()
+                }
+            }
+        }
+    }
+
+    private func stopOutsideClickMonitor() {
+        if let monitor = outsideClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            outsideClickMonitor = nil
+        }
+    }
 }
 
-// MARK: - NSWindowDelegate (click-outside-to-collapse)
+// MARK: - NSWindowDelegate
 
 extension NotchPanelController: NSWindowDelegate {
+}
 
-    func windowDidResignKey(_ notification: Notification) {
-        // Collapse when another window becomes key, unless we're intentionally
-        // keeping a text field focused
-        if viewModel.state == .expanded && !viewModel.requestFocusOnNoteInput {
-            collapse()
+// MARK: - NSDraggingDestination
+
+extension NotchPanelController: NSDraggingDestination {
+
+    func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        logger.info("NotchPanelController draggingEntered!")
+        peekTimer?.cancel()
+        viewModel.isDraggingOverNotch = true
+        if viewModel.state != .expanded {
+            expand()
         }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            viewModel.activeTab = .holder
+        }
+        return .copy
+    }
+
+    func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        return .copy
+    }
+
+    func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        logger.info("NotchPanelController draggingExited")
+        viewModel.isDraggingOverNotch = false
+    }
+
+    func prepareForDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        return true
+    }
+
+    func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        logger.info("NotchPanelController performDragOperation!")
+        viewModel.isDraggingOverNotch = false
+        let urls = extractURLsFromPasteboard(sender.draggingPasteboard)
+        guard !urls.isEmpty else { return false }
+        for url in urls {
+            holderManager.addItem(from: url)
+        }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            viewModel.activeTab = .holder
+        }
+        return true
     }
 }
 
@@ -430,9 +751,13 @@ extension NotchPanelController: NSWindowDelegate {
 
 final class NotchHostingView<Content: View>: NSHostingView<Content> {
 
+    weak var panelController: NotchPanelController?
     var onDragEntered: (() -> Void)?
     var onDragExited: (() -> Void)?
     var onPerformDrag: ((any NSDraggingInfo) -> Bool)?
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        return true
+    }
 
     @MainActor required init(rootView: Content) {
         super.init(rootView: rootView)
@@ -441,9 +766,14 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
             .URL,
             .string,
             NSPasteboard.PasteboardType("public.item"),
+            NSPasteboard.PasteboardType("public.data"),
+            NSPasteboard.PasteboardType("public.content"),
+            NSPasteboard.PasteboardType("com.apple.dock.item"),
             NSPasteboard.PasteboardType("com.apple.application-bundle"),
             NSPasteboard.PasteboardType("public.file-url"),
-            NSPasteboard.PasteboardType("NSFilenamesPboardType")
+            NSPasteboard.PasteboardType("NSFilenamesPboardType"),
+            NSPasteboard.PasteboardType("Apple URL pasteboard type"),
+            NSPasteboard.PasteboardType("com.apple.pasteboard.promised-file-url")
         ])
     }
 

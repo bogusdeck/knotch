@@ -52,10 +52,22 @@ struct PeekView: View {
                         .scaledToFill()
                         .frame(width: 18, height: 18)
                         .cornerRadius(4)
+                } else if let urlStr = media.artworkUrl, let url = URL(string: urlStr) {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            Image(systemName: "music.note")
+                                .imageScale(.small)
+                                .foregroundStyle(media.brandColor)
+                        }
+                    }
+                    .frame(width: 18, height: 18)
+                    .cornerRadius(4)
                 } else {
                     Image(systemName: "music.note")
                         .imageScale(.small)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(media.brandColor)
                 }
 
                 Text("\(media.title) — \(media.artist)")

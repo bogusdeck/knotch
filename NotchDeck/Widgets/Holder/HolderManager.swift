@@ -16,6 +16,7 @@ final class HolderManager: ObservableObject {
 
     @Published private(set) var items: [HolderItem] = []
     @Published var selectedItemForPreview: HolderItem? = nil
+    @Published var activeEmbeddedAppItem: HolderItem? = nil
 
     // MARK: - Paths
 
@@ -116,24 +117,82 @@ final class HolderManager: ObservableObject {
         if selectedItemForPreview?.id == item.id {
             selectedItemForPreview = nil
         }
+        if activeEmbeddedAppItem?.id == item.id {
+            activeEmbeddedAppItem = nil
+        }
         items.removeAll { $0.id == item.id }
         saveItems()
         logger.info("Removed holder item: \(item.name)")
     }
 
     func launchOrOpenItem(_ item: HolderItem) {
-        if item.isApplication {
-            let config = NSWorkspace.OpenConfiguration()
-            config.activates = true
-            NSWorkspace.shared.openApplication(at: item.url, configuration: config) { _, error in
-                if let error {
-                    logger.error("Failed to launch application \(item.name): \(error)")
-                }
-            }
+        if item.webCompanionURL != nil {
+            openEmbeddedApp(item)
+        } else if item.isApplication {
+            launchNativeApp(item)
         } else if item.isPDF {
             selectedItemForPreview = item
         } else {
             NSWorkspace.shared.open(item.url)
+        }
+    }
+
+    func openEmbeddedApp(_ item: HolderItem) {
+        selectedItemForPreview = nil
+        activeEmbeddedAppItem = item
+        logger.info("Opening embedded web view for \(item.name)")
+    }
+
+    func closeEmbeddedApp() {
+        activeEmbeddedAppItem = nil
+        logger.info("Closed embedded web view")
+    }
+
+    func launchNativeApp(_ item: HolderItem) {
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        NSWorkspace.shared.openApplication(at: item.url, configuration: config) { app, error in
+            if let error {
+                logger.error("Failed to launch application \(item.name): \(error)")
+                return
+            }
+            if let app {
+                Task { @MainActor in
+                    self.dockWindowToNotch(for: app)
+                }
+            }
+        }
+    }
+
+    private func dockWindowToNotch(for app: NSRunningApplication) {
+        // Try docking with multiple delays to accommodate both instant activation and cold-launch window creation
+        for delay in [0.15, 0.5, 1.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                let appElement = AXUIElementCreateApplication(app.processIdentifier)
+                var windowsRef: AnyObject?
+                guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+                      let windows = windowsRef as? [AXUIElement], let frontWindow = windows.first else {
+                    return
+                }
+
+                let notchFrame = NotchGeometryDetector.detect().notchFrame
+
+                var currentSize = CGSize.zero
+                var sizeVal: AnyObject?
+                if AXUIElementCopyAttributeValue(frontWindow, kAXSizeAttribute as CFString, &sizeVal) == .success,
+                   let val = sizeVal as! AXValue? {
+                    AXValueGetValue(val, .cgSize, &currentSize)
+                }
+
+                let winWidth = max(currentSize.width, 700)
+                let targetX = notchFrame.midX - (winWidth / 2)
+                let targetY = max(notchFrame.height + 6, 36)
+
+                var newPoint = CGPoint(x: max(10, targetX), y: targetY)
+                if let pointVal = AXValueCreate(.cgPoint, &newPoint) {
+                    AXUIElementSetAttributeValue(frontWindow, kAXPositionAttribute as CFString, pointVal)
+                }
+            }
         }
     }
 
@@ -174,11 +233,53 @@ enum DropURLHelper {
     ]
 
     static func extractURLs(from providers: [NSItemProvider], completion: @escaping @MainActor ([URL]) -> Void) {
-        // Fast path: Check active drag pasteboard first (always populated when dragging files/apps in macOS)
-        if let dragURLs = NSPasteboard(name: .drag).readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
-           !dragURLs.isEmpty {
+        let dragPb = NSPasteboard(name: .drag)
+
+        // Fast path 1: Check active drag pasteboard objects
+        if let dragURLs = dragPb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL], !dragURLs.isEmpty {
             completion(dragURLs)
             return
+        }
+
+        // Fast path 2: Check Dock-specific item plist on drag pasteboard
+        let dockType = NSPasteboard.PasteboardType("com.apple.dock.item")
+        if let dockPlist = (dragPb.propertyList(forType: dockType) as? [String: Any]) ??
+           (dragPb.data(forType: dockType).flatMap { (try? PropertyListSerialization.propertyList(from: $0, format: nil)) as? [String: Any] }) {
+            let target = (dockPlist["tile-data"] as? [String: Any]) ?? dockPlist
+            if let fileData = target["file-data"] as? [String: Any],
+               let urlString = fileData["_CFURLString"] as? String,
+               let url = URL(string: urlString) {
+                completion([url])
+                return
+            } else if let bundleId = target["bundle-identifier"] as? String,
+                      let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+                completion([appURL])
+                return
+            } else if let label = target["file-label"] as? String {
+                let appURL = URL(fileURLWithPath: "/Applications/\(label).app")
+                if FileManager.default.fileExists(atPath: appURL.path) {
+                    completion([appURL])
+                    return
+                }
+            }
+        }
+
+        // Fast path 3: Check NSFilenamesPboardType
+        if let filenames = dragPb.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String], !filenames.isEmpty {
+            let urls = filenames.map { URL(fileURLWithPath: $0) }
+            completion(urls)
+            return
+        }
+
+        // Fast path 4: Check string / file-url
+        if let string = dragPb.string(forType: .string) {
+            if string.hasPrefix("file://"), let url = URL(string: string) {
+                completion([url])
+                return
+            } else if FileManager.default.fileExists(atPath: string) {
+                completion([URL(fileURLWithPath: string)])
+                return
+            }
         }
 
         Task { @MainActor in
@@ -194,6 +295,7 @@ enum DropURLHelper {
 
     private static func extractSingleURLAsync(from provider: NSItemProvider) async -> URL? {
         let candidateTypes = [
+            "com.apple.dock.item",
             UTType.applicationBundle.identifier,
             UTType.application.identifier,
             UTType.fileURL.identifier,
@@ -233,7 +335,43 @@ enum DropURLHelper {
         if let url = item as? URL {
             return url
         }
+        if let dockDict = item as? [String: Any] {
+            let target = (dockDict["tile-data"] as? [String: Any]) ?? dockDict
+            if let fileData = target["file-data"] as? [String: Any],
+               let urlString = fileData["_CFURLString"] as? String,
+               let url = URL(string: urlString) {
+                return url
+            }
+            if let bundleId = target["bundle-identifier"] as? String,
+               let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+                return appURL
+            }
+            if let label = target["file-label"] as? String {
+                let appURL = URL(fileURLWithPath: "/Applications/\(label).app")
+                if FileManager.default.fileExists(atPath: appURL.path) {
+                    return appURL
+                }
+            }
+        }
         if let data = item as? Data {
+            if let plist = (try? PropertyListSerialization.propertyList(from: data, options: [], format: nil)) as? [String: Any] {
+                let target = (plist["tile-data"] as? [String: Any]) ?? plist
+                if let fileData = target["file-data"] as? [String: Any],
+                   let urlString = fileData["_CFURLString"] as? String,
+                   let url = URL(string: urlString) {
+                    return url
+                }
+                if let bundleId = target["bundle-identifier"] as? String,
+                   let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+                    return appURL
+                }
+                if let label = target["file-label"] as? String {
+                    let appURL = URL(fileURLWithPath: "/Applications/\(label).app")
+                    if FileManager.default.fileExists(atPath: appURL.path) {
+                        return appURL
+                    }
+                }
+            }
             if let url = URL(dataRepresentation: data, relativeTo: nil) {
                 return url
             }

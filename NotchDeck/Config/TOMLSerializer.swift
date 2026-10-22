@@ -35,6 +35,7 @@ enum TOMLSerializer {
         lines.append("expanded_width = \(config.appearance.expandedWidth)")
         lines.append("expanded_height = \(config.appearance.expandedHeight)")
         lines.append("corner_radius = \(config.appearance.cornerRadius)")
+        lines.append("dynamic_sizing = \(config.appearance.dynamicSizing)")
         lines.append("")
 
         // [layout]

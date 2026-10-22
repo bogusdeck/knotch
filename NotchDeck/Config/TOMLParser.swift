@@ -76,6 +76,7 @@ enum TOMLParser {
         if let v = table["expanded_width"]?.int { appearance.expandedWidth = v }
         if let v = table["expanded_height"]?.int { appearance.expandedHeight = v }
         if let v = table["corner_radius"]?.int { appearance.cornerRadius = v }
+        if let v = table["dynamic_sizing"]?.bool { appearance.dynamicSizing = v }
         return appearance
     }
 
@@ -106,6 +107,7 @@ enum TOMLParser {
         if let v = table["cwd"]?.string { widget.cwd = v }
         if let v = table["autostart"]?.bool { widget.autostart = v }
         if let v = table["interval_s"]?.int { widget.intervalS = v }
+        if let v = table["url"]?.string { widget.url = v }
         if let v = table["path"]?.string { widget.path = v }
         if let v = table["allow_shell"]?.bool { widget.allowShell = v }
         if let v = table["applescript"]?.string { widget.applescript = v }

@@ -79,6 +79,12 @@ final class ConfigManager: ObservableObject {
         logger.info("Saved updated config to disk")
     }
 
+    /// Updates appearance in-memory immediately for live previews in Settings.
+    func updateAppearanceLive(_ appearance: AppearanceConfig) {
+        guard self.config.appearance != appearance else { return }
+        self.config.appearance = appearance
+    }
+
     func openConfigFileInDefaultEditor() {
         NSWorkspace.shared.open(Self.configFile)
     }

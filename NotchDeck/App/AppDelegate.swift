@@ -3,6 +3,7 @@
 // Owns the NotchPanelController and status-bar item (fallback for non-notch Macs).
 
 import AppKit
+import AuthenticationServices
 import Combine
 import KeyboardShortcuts
 import OSLog
@@ -44,6 +45,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 5. Never appear in the Dock or app switcher
         NSApp.setActivationPolicy(.accessory)
+
+        // 6. Memory optimization: cap URLCache memory footprint to 20MB (default is 512MB)
+        URLCache.shared = URLCache(memoryCapacity: 20 * 1024 * 1024, diskCapacity: 100 * 1024 * 1024)
+
+        // 7. Request WebBrowser public key credentials (Passkeys / Touch ID) authorization
+        if #available(macOS 13.3, *) {
+            let credManager = ASAuthorizationWebBrowserPublicKeyCredentialManager()
+            if credManager.authorizationStateForPlatformCredentials == .notDetermined {
+                credManager.requestAuthorizationForPublicKeyCredentials { state in
+                    logger.info("Passkey authorization state: \(state.rawValue)")
+                }
+            }
+        }
 
         logger.info("NotchDeck ready")
     }

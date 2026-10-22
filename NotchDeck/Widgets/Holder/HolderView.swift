@@ -6,12 +6,19 @@ import AppKit
 import PDFKit
 import SwiftUI
 import UniformTypeIdentifiers
+import WebKit
 
 struct HolderView: View {
 
     @ObservedObject var holderManager: HolderManager
+    var viewModel: NotchViewModel? = nil
+    @Environment(\.deckTheme) private var theme: DeckTheme
     @State private var isTargetedForDrop: Bool = false
     @State private var hoveredItemId: UUID? = nil
+
+    private var isActivelyDragging: Bool {
+        isTargetedForDrop || (viewModel?.isDraggingOverNotch == true)
+    }
 
     private var appItems: [HolderItem] {
         holderManager.items.filter { $0.isApplication }
@@ -30,11 +37,20 @@ struct HolderView: View {
     ]
 
     var body: some View {
-        Group {
-            if let previewItem = holderManager.selectedItemForPreview {
+        ZStack {
+            if let activeApp = holderManager.activeEmbeddedAppItem, let webURL = activeApp.webCompanionURL {
+                embeddedWebAppView(for: activeApp, url: webURL)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            } else if let previewItem = holderManager.selectedItemForPreview {
                 embeddedPreviewView(for: previewItem)
             } else {
                 mainCanvasView
+            }
+
+            if isActivelyDragging {
+                dropHereOverlay
+                    .zIndex(100)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -62,17 +78,17 @@ struct HolderView: View {
                                 HStack(spacing: 6) {
                                     Image(systemName: "app.badge.fill")
                                         .font(.system(size: 11))
-                                        .foregroundStyle(.purple.opacity(0.85))
+                                        .foregroundStyle(theme.accent)
                                     Text("Applications")
                                         .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(.white.opacity(0.8))
+                                        .foregroundStyle(theme.primaryText)
 
                                     Text("\(appItems.count)")
                                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 1)
-                                        .background(Capsule().fill(Color.white.opacity(0.08)))
-                                        .foregroundStyle(.white.opacity(0.5))
+                                        .background(Capsule().fill(theme.inputBackground))
+                                        .foregroundStyle(theme.secondaryText)
                                 }
                                 .padding(.horizontal, 14)
 
@@ -94,14 +110,14 @@ struct HolderView: View {
                                         .foregroundStyle(.blue.opacity(0.85))
                                     Text("Documents & Files")
                                         .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(.white.opacity(0.8))
+                                        .foregroundStyle(theme.primaryText)
 
                                     Text("\(documentItems.count)")
                                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 1)
-                                        .background(Capsule().fill(Color.white.opacity(0.08)))
-                                        .foregroundStyle(.white.opacity(0.5))
+                                        .background(Capsule().fill(theme.inputBackground))
+                                        .foregroundStyle(theme.secondaryText)
                                 }
                                 .padding(.horizontal, 14)
 
@@ -121,24 +137,41 @@ struct HolderView: View {
         }
     }
 
+    private func downsampledImage(from url: URL, maxPixelSize: CGFloat = 1200) -> NSImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else {
+            return nil
+        }
+        let downsampleOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+        ] as CFDictionary
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions) else {
+            return nil
+        }
+        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+    }
+
     // MARK: - Header Bar
 
     private var headerBar: some View {
         HStack(spacing: 8) {
             Image(systemName: isTargetedForDrop ? "arrow.down.circle.fill" : "macwindow.on.rectangle")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(isTargetedForDrop ? .purple : .white.opacity(0.7))
+                .foregroundStyle(isTargetedForDrop ? theme.accent : theme.secondaryText)
 
             Text(isTargetedForDrop ? "Drop apps or documents to add to Holder" : "Holder")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isTargetedForDrop ? .purple : .white.opacity(0.85))
+                .foregroundStyle(isTargetedForDrop ? theme.accent : theme.primaryText)
 
             Spacer()
 
             if !holderManager.items.isEmpty {
                 Text("\(holderManager.items.count) item\(holderManager.items.count == 1 ? "" : "s")")
                     .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(theme.tertiaryText)
             }
         }
         .padding(.horizontal, 14)
@@ -182,28 +215,29 @@ struct HolderView: View {
                     .font(.system(size: 10, weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.primaryText)
 
                 // Sub-label
-                Text(running ? "Running" : "App")
+                Text(item.webCompanionURL != nil ? "In-Notch Web" : (running ? "Running" : "App"))
                     .font(.system(size: 8))
-                    .foregroundStyle(running ? .green.opacity(0.8) : .white.opacity(0.35))
+                    .foregroundStyle(item.webCompanionURL != nil ? theme.accent : (running ? .green : theme.tertiaryText))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .padding(.horizontal, 6)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isHovered ? Color.white.opacity(0.12) : Color.white.opacity(0.04))
+                    .fill(isHovered ? theme.tabHover : theme.cardBackground)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(isHovered ? Color.purple.opacity(0.6) : Color.white.opacity(0.06), lineWidth: 1)
+                    .stroke(isHovered ? theme.accent.opacity(0.6) : theme.cardBorder, lineWidth: 1)
             )
             .scaleEffect(isHovered ? 1.03 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: isHovered)
         }
         .buttonStyle(.plain)
+        .pointingHandCursor()
         .onHover { hovered in
             hoveredItemId = hovered ? item.id : nil
         }
@@ -211,8 +245,16 @@ struct HolderView: View {
             NSItemProvider(contentsOf: item.url) ?? NSItemProvider(object: item.path as NSString)
         }
         .contextMenu {
-            Button("Launch \(item.name)") {
-                holderManager.launchOrOpenItem(item)
+            if let webURL = item.webCompanionURL {
+                Button("Open inside Notch") {
+                    holderManager.openEmbeddedApp(item)
+                }
+                Button("Open in Default Browser") {
+                    NSWorkspace.shared.open(webURL)
+                }
+            }
+            Button("Launch Native App") {
+                holderManager.launchNativeApp(item)
             }
             Button("Reveal in Finder") {
                 holderManager.revealInFinder(item)
@@ -225,7 +267,7 @@ struct HolderView: View {
                 holderManager.removeItem(item)
             }
         }
-        .help(running ? "\(item.name) (Running - Click to activate)" : "\(item.name) (Click to launch)")
+        .help(item.webCompanionURL != nil ? "\(item.name) (Click to run inside Notch)" : (running ? "\(item.name) (Running)" : "\(item.name) (Click to launch)"))
     }
 
     // MARK: - Document Cell
@@ -255,7 +297,7 @@ struct HolderView: View {
                 .font(.system(size: 10, weight: .medium))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
+                .foregroundStyle(theme.primaryText)
 
             // Inline action badges
             HStack(spacing: 4) {
@@ -271,10 +313,11 @@ struct HolderView: View {
                         }
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.white.opacity(0.12)))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .background(Capsule().fill(theme.inputBackground))
+                        .foregroundStyle(theme.secondaryText)
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                 }
 
                 Button {
@@ -283,10 +326,11 @@ struct HolderView: View {
                     Image(systemName: "arrow.up.forward.app")
                         .font(.system(size: 8))
                         .padding(3)
-                        .background(Circle().fill(Color.white.opacity(0.08)))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .background(Circle().fill(theme.inputBackground))
+                        .foregroundStyle(theme.secondaryText)
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
                 .help("Open in default application")
             }
         }
@@ -295,14 +339,15 @@ struct HolderView: View {
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isHovered ? Color.white.opacity(0.12) : Color.white.opacity(0.04))
+                .fill(isHovered ? theme.tabHover : theme.cardBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(isHovered ? Color.blue.opacity(0.6) : Color.white.opacity(0.06), lineWidth: 1)
+                .stroke(isHovered ? Color.blue.opacity(0.6) : theme.cardBorder, lineWidth: 1)
         )
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .pointingHandCursor()
         .onHover { hovered in
             hoveredItemId = hovered ? item.id : nil
         }
@@ -349,16 +394,17 @@ struct HolderView: View {
                         Text("Back")
                             .font(.system(size: 11, weight: .medium))
                     }
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(theme.primaryText)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.1)))
+                    .background(RoundedRectangle(cornerRadius: 6).fill(theme.inputBackground))
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
 
                 Text(item.name)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.primaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
@@ -373,12 +419,13 @@ struct HolderView: View {
                         Text("Open in App")
                             .font(.system(size: 10, weight: .medium))
                     }
-                    .foregroundStyle(.white.opacity(0.75))
+                    .foregroundStyle(theme.secondaryText)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.08)))
+                    .background(RoundedRectangle(cornerRadius: 6).fill(theme.inputBackground))
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
                 .help("Open with system default application")
 
                 Button {
@@ -386,23 +433,24 @@ struct HolderView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(theme.secondaryText)
                         .padding(5)
-                        .background(Circle().fill(Color.white.opacity(0.08)))
+                        .background(Circle().fill(theme.inputBackground))
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
-            .background(Color.black.opacity(0.3))
+            .background(theme.cardBackground)
 
-            Divider().overlay(Color.white.opacity(0.1))
+            Divider().overlay(theme.divider)
 
             // Body: PDF viewer or fallback viewer
             if item.isPDF {
                 PDFKitRepresentable(url: item.url)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if item.kind == .image, let nsImage = NSImage(contentsOf: item.url) {
+            } else if item.kind == .image, let nsImage = downsampledImage(from: item.url) ?? NSImage(contentsOf: item.url) {
                 ScrollView {
                     Image(nsImage: nsImage)
                         .resizable()
@@ -415,10 +463,10 @@ struct HolderView: View {
                         .frame(width: 64, height: 64)
                     Text(item.name)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.primaryText)
                     Text(item.path)
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(theme.tertiaryText)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
 
@@ -432,6 +480,114 @@ struct HolderView: View {
         }
     }
 
+    // MARK: - Embedded Web App View
+
+    private func embeddedWebAppView(for item: HolderItem, url: URL) -> some View {
+        VStack(spacing: 0) {
+            // Header bar
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        holderManager.closeEmbeddedApp()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.backward")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Holder")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(theme.inputBackground))
+                    .foregroundStyle(theme.primaryText)
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+
+                itemIcon(for: item)
+                    .frame(width: 18, height: 18)
+
+                Text(item.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+
+                if let host = url.host {
+                    Text(host)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(theme.tertiaryText)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(theme.inputBackground.opacity(0.6)))
+                }
+
+                Spacer()
+
+                // Open in External Browser button
+                Button {
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.forward.square")
+                            .font(.system(size: 10))
+                        Text("Open in Browser")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(theme.inputBackground))
+                    .foregroundStyle(theme.secondaryText)
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+                .help("Open in your default web browser")
+
+                // Launch Native App button
+                Button {
+                    holderManager.launchNativeApp(item)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.forward.app")
+                            .font(.system(size: 10))
+                        Text("Open Native App")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(theme.inputBackground))
+                    .foregroundStyle(theme.secondaryText)
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+                .help("Open in native macOS \(item.name) application")
+
+                // Close button
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        holderManager.closeEmbeddedApp()
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(theme.secondaryText)
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(theme.cardBackground)
+
+            Divider().overlay(theme.divider)
+
+            // Web View
+            HolderWebView(url: url)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     // MARK: - Helpers
 
     private func itemIcon(for item: HolderItem) -> some View {
@@ -441,23 +597,72 @@ struct HolderView: View {
             .scaledToFit()
     }
 
+    // MARK: - Drop Here Overlay
+
+    private var dropHereOverlay: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14)
+                .fill(theme.background.opacity(0.92))
+
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    style: StrokeStyle(lineWidth: 2.5, dash: [8, 5])
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [theme.accent, Color.cyan, theme.accent],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(theme.accent.opacity(0.18))
+                        .frame(width: 58, height: 58)
+
+                    Circle()
+                        .stroke(theme.accent.opacity(0.4), lineWidth: 1.5)
+                        .frame(width: 58, height: 58)
+
+                    Image(systemName: "arrow.down.app.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(theme.accent)
+                }
+
+                VStack(spacing: 4) {
+                    Text("Drop App Here to Hold")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(theme.primaryText)
+
+                    Text("Release mouse to pin application to your NotchDeck Holder")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(theme.secondaryText)
+                }
+            }
+            .padding(16)
+        }
+        .padding(8)
+    }
+
     // MARK: - Empty State
 
     private var emptyHolderView: some View {
         VStack(spacing: 10) {
             Image(systemName: "macwindow.on.rectangle")
                 .font(.system(size: 34))
-                .foregroundStyle(.white.opacity(0.2))
+                .foregroundStyle(theme.tertiaryText)
                 .padding(.top, 28)
 
             Text("Holder is Empty")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(theme.secondaryText)
 
             Text("Drag and drop your favorite applications (like Slack)\nor documents (like PDFs) here to pin them to your notch.")
                 .font(.system(size: 10.5))
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white.opacity(0.35))
+                .foregroundStyle(theme.tertiaryText)
                 .padding(.horizontal, 40)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -495,6 +700,33 @@ struct PDFKitRepresentable: NSViewRepresentable {
     func updateNSView(_ nsView: PDFView, context: Context) {
         if nsView.document?.documentURL != url {
             nsView.document = PDFDocument(url: url)
+        }
+    }
+}
+
+// MARK: - HolderWebView Representable
+
+struct HolderWebView: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.processPool = WebKitShared.processPool
+        config.websiteDataStore = .default()
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+        config.defaultWebpagePreferences.allowsContentJavaScript = true
+        config.allowsAirPlayForMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+
+        let webView = FirstClickWebView(frame: .zero, configuration: config)
+        webView.customUserAgent = WebTabItem.userAgent(for: url)
+        webView.load(URLRequest(url: url))
+        return webView
+    }
+
+    func updateNSView(_ nsView: WKWebView, context: Context) {
+        if nsView.url == nil {
+            nsView.load(URLRequest(url: url))
         }
     }
 }

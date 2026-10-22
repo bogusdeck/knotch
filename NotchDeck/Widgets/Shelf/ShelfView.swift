@@ -10,6 +10,7 @@ struct ShelfView: View {
 
     @ObservedObject var shelfManager: ShelfManager
     var copyOnDrop: Bool = false
+    @Environment(\.deckTheme) private var theme: DeckTheme
 
     @State private var isTargetedForDrop: Bool = false
     @State private var hoveredItemId: UUID? = nil
@@ -48,16 +49,16 @@ struct ShelfView: View {
     private var dropTargetHeader: some View {
         HStack {
             Image(systemName: "tray.and.arrow.down")
-                .foregroundStyle(isTargetedForDrop ? .purple : .white.opacity(0.4))
+                .foregroundStyle(isTargetedForDrop ? theme.accent : theme.secondaryText)
             Text(isTargetedForDrop ? "Drop to pin to shelf" : "File Shelf")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(isTargetedForDrop ? .purple : .white.opacity(0.6))
+                .foregroundStyle(isTargetedForDrop ? theme.accent : theme.primaryText)
 
             Spacer()
 
             Text("\(shelfManager.items.count) item\(shelfManager.items.count == 1 ? "" : "s")")
                 .font(.system(size: 9))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(theme.tertiaryText)
         }
         .padding(.horizontal, 14)
         .padding(.top, 8)
@@ -76,22 +77,22 @@ struct ShelfView: View {
                 .font(.system(size: 10, weight: .medium))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
+                .foregroundStyle(theme.primaryText)
 
             // Kind indicator
             Text(item.isFolder ? "Folder" : (item.isCopied ? "Copied" : "Reference"))
                 .font(.system(size: 8))
-                .foregroundStyle(.white.opacity(0.35))
+                .foregroundStyle(theme.tertiaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(8)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(hoveredItemId == item.id ? Color.white.opacity(0.1) : Color.white.opacity(0.04))
+                .fill(hoveredItemId == item.id ? theme.tabHover : theme.cardBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(hoveredItemId == item.id ? Color.purple.opacity(0.5) : Color.clear, lineWidth: 1)
+                .stroke(hoveredItemId == item.id ? theme.accent.opacity(0.6) : theme.cardBorder, lineWidth: 1)
         )
         .onHover { isHovered in
             hoveredItemId = isHovered ? item.id : nil
@@ -138,16 +139,16 @@ struct ShelfView: View {
         VStack(spacing: 8) {
             Image(systemName: "tray.2")
                 .font(.system(size: 32))
-                .foregroundStyle(.white.opacity(0.25))
+                .foregroundStyle(theme.tertiaryText)
                 .padding(.top, 24)
 
             Text("Shelf is empty")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(theme.secondaryText)
 
             Text("Drag and drop files or folders here\nor drop onto the notch directly")
                 .font(.system(size: 10))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(theme.tertiaryText)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, alignment: .center)

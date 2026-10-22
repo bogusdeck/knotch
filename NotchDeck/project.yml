@@ -46,6 +46,7 @@ targets:
       - path: Config
       - path: Widgets
       - path: Settings
+      - path: UI
       - path: Resources
         type: folder
     resources:
