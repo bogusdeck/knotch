@@ -286,7 +286,11 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
         }
         if self.unreadCount != count {
             self.unreadCount = count
-            NotificationCenter.default.post(name: .whatsAppUnreadCountChanged, object: nil, userInfo: ["count": count])
+            NotificationCenter.default.post(
+                name: .whatsAppUnreadCountChanged,
+                object: nil,
+                userInfo: ["count": count, "source": self.id]
+            )
         }
     }
 
@@ -358,7 +362,7 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
             Task { @MainActor in
                 if let t = wv.title?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty {
                     self?.pageTitle = t
-                    if self?.id == "whatsapp" {
+                    if self?.id == "whatsapp" || self?.id == "googlechat" {
                         self?.updateUnreadFromTitle(t)
                     }
                 }

@@ -41,8 +41,8 @@ final class WebTabItem: NSObject, ObservableObject, Identifiable, WKNavigationDe
         guard let host = url?.host?.lowercased() else {
             return safariUserAgent
         }
-        // Slack and WhatsApp web clients require Chromium UA
-        if host.contains("slack.com") || host.contains("whatsapp.com") {
+        // Slack, WhatsApp, and Google Chat web clients require Chromium UA
+        if host.contains("slack.com") || host.contains("whatsapp.com") || host.contains("chat.google.com") {
             return chromeUserAgent
         }
         // Google Search and general web use genuine Safari desktop UA
@@ -252,6 +252,7 @@ final class WebTabItem: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     var iconName: String {
         let lower = (title + " " + currentURLString).lowercased()
+        if lower.contains("chat.google.com") || lower.contains("google chat") { return "bubble.left.and.bubble.right.fill" }
         if lower.contains("spotify") { return "music.note" }
         if lower.contains("whatsapp") { return "message.fill" }
         if lower.contains("slack") { return "number" }
@@ -267,6 +268,7 @@ final class WebTabItem: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     var brandColor: Color {
         let lower = (title + " " + currentURLString).lowercased()
+        if lower.contains("chat.google.com") || lower.contains("google chat") { return Color(red: 0.0, green: 0.67, blue: 0.45) }
         if lower.contains("spotify") { return Color(red: 0.11, green: 0.73, blue: 0.33) }
         if lower.contains("whatsapp") { return Color(red: 0.15, green: 0.78, blue: 0.42) }
         if lower.contains("slack") { return Color(red: 0.88, green: 0.15, blue: 0.44) }

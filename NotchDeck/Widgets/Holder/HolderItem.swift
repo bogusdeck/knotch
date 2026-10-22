@@ -68,6 +68,9 @@ struct HolderItem: Identifiable, Codable, Sendable, Equatable {
     }
     var webCompanionURL: URL? {
         let lower = name.lowercased()
+        if lower.contains("google chat") || lower.contains("gchat") {
+            return URL(string: "https://chat.google.com")
+        }
         if lower.contains("whatsapp") {
             return URL(string: "https://web.whatsapp.com")
         }

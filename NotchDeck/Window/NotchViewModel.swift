@@ -8,7 +8,7 @@ import SwiftUI
 
 /// Which tab is shown in the expanded notch.
 enum NotchTab: String, CaseIterable {
-    case home, notes, shelf, terminal, holder, vpn, web, whatsapp, slack
+    case home, notes, shelf, terminal, holder, vpn, web, whatsapp, slack, googlechat
 }
 
 @MainActor
@@ -37,8 +37,9 @@ final class NotchViewModel: ObservableObject {
     /// Geometry is updated on screen-change notifications.
     @Published var geometry: NotchGeometry
 
-    /// Active unread WhatsApp notification count
+    /// Active unread message notification count (WhatsApp, Google Chat)
     @Published var whatsAppUnreadCount: Int = 0
+    @Published var lastUnreadSource: String = "whatsapp"
     var hasWhatsAppNotification: Bool {
         whatsAppUnreadCount > 0
     }

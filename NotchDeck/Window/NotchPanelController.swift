@@ -352,7 +352,11 @@ final class NotchPanelController: NSObject {
         logger.debug("→ expanded")
         peekTimer?.cancel()
         if viewModel.hasWhatsAppNotification {
-            viewModel.activeTab = .whatsapp
+            if viewModel.lastUnreadSource == "googlechat" {
+                viewModel.activeTab = .googlechat
+            } else {
+                viewModel.activeTab = .whatsapp
+            }
             viewModel.activeCustomTabId = nil
         }
 
@@ -554,7 +558,7 @@ final class NotchPanelController: NSObject {
             return (540, 230)
         case .shelf:
             return (620, 260)
-        case .web, .whatsapp, .slack:
+        case .web, .whatsapp, .slack, .googlechat:
             let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
             let maxW = (screen?.visibleFrame.width ?? 1200) * 0.92
             let maxH = (screen?.visibleFrame.height ?? 800) * 0.82
@@ -602,7 +606,9 @@ final class NotchPanelController: NSObject {
 
     @objc private func handleWhatsAppUnreadChanged(_ notification: Notification) {
         let count = notification.userInfo?["count"] as? Int ?? 0
+        let source = notification.userInfo?["source"] as? String ?? "whatsapp"
         Task { @MainActor in
+            self.viewModel.lastUnreadSource = source
             withAnimation(.spring(response: 0.36, dampingFraction: 0.8)) {
                 self.viewModel.whatsAppUnreadCount = count
             }

@@ -91,6 +91,8 @@ struct ExpandedView: View {
                 items.append(TabItemModel(id: "home", title: "Home", iconName: "square.grid.2x2", builtInTab: .home))
             case "notes":
                 items.append(TabItemModel(id: "notes", title: "Notes", iconName: "note.text", builtInTab: .notes))
+            case "googlechat", "gchat", "chat":
+                items.append(TabItemModel(id: "googlechat", title: "Chat", iconName: "bubble.left.and.bubble.right.fill", builtInTab: .googlechat))
             case "whatsapp":
                 items.append(TabItemModel(id: "whatsapp", title: "WhatsApp", iconName: "message.fill", builtInTab: .whatsapp))
             case "slack":
@@ -328,6 +330,16 @@ struct ExpandedView: View {
                 )
             case .notes:
                 NotesView(notesManager: notesManager, viewModel: viewModel)
+            case .googlechat:
+                DedicatedWebView(
+                    id: "googlechat",
+                    title: "Google Chat",
+                    icon: "bubble.left.and.bubble.right.fill",
+                    brandColor: Color(red: 0.0, green: 0.67, blue: 0.45),
+                    defaultURL: URL(string: "https://chat.google.com")!,
+                    userAgent: WebTabItem.chromeUserAgent,
+                    viewModel: viewModel
+                )
             case .whatsapp:
                 DedicatedWebView(
                     id: "whatsapp",
@@ -658,29 +670,31 @@ private struct SettingsCategoryTabButton: View {
 extension NotchTab {
     var displayName: String {
         switch self {
-        case .home:     "Home"
-        case .notes:    "Notes"
-        case .whatsapp: "WhatsApp"
-        case .slack:    "Slack"
-        case .shelf:    "Shelf"
-        case .terminal: "Terminal"
-        case .holder:   "Holder"
-        case .vpn:      "VPN"
-        case .web:      "Web"
+        case .home:       "Home"
+        case .notes:      "Notes"
+        case .googlechat: "Chat"
+        case .whatsapp:   "WhatsApp"
+        case .slack:      "Slack"
+        case .shelf:      "Shelf"
+        case .terminal:   "Terminal"
+        case .holder:     "Holder"
+        case .vpn:        "VPN"
+        case .web:        "Web"
         }
     }
 
     var iconName: String {
         switch self {
-        case .home:     "square.grid.2x2"
-        case .notes:    "note.text"
-        case .whatsapp: "message.fill"
-        case .slack:    "number"
-        case .shelf:    "tray.2"
-        case .terminal: "terminal"
-        case .holder:   "macwindow.on.rectangle"
-        case .vpn:      "lock.shield"
-        case .web:      "globe"
+        case .home:       "square.grid.2x2"
+        case .notes:      "note.text"
+        case .googlechat: "bubble.left.and.bubble.right.fill"
+        case .whatsapp:   "message.fill"
+        case .slack:      "number"
+        case .shelf:      "tray.2"
+        case .terminal:   "terminal"
+        case .holder:     "macwindow.on.rectangle"
+        case .vpn:        "lock.shield"
+        case .web:        "globe"
         }
     }
 }
