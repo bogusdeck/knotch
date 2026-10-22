@@ -27,52 +27,6 @@ class FirstClickWebView: WKWebView {
     }
 }
 
-// MARK: - WebAuthn & Platform Passkey Helper
-
-@MainActor
-enum WebAuthnScriptHelper {
-    static let scriptSource = """
-    (function() {
-        if (window.__notchdeck_webauthn_ready) return;
-        window.__notchdeck_webauthn_ready = true;
-
-        if (navigator.credentials && navigator.credentials.get) {
-            const origGet = navigator.credentials.get.bind(navigator.credentials);
-            navigator.credentials.get = async function(options) {
-                // If it is a Passkey / WebAuthn public key assertion request on Google,
-                // reject with NotSupportedError so Google cleanly falls back to standard Password / 2FA.
-                if (options && options.publicKey) {
-                    var isGoogle = false;
-                    try {
-                        var host = (window.location && window.location.hostname) ? window.location.hostname : '';
-                        if (host.indexOf('google.') !== -1 || host.indexOf('youtube.') !== -1) {
-                            isGoogle = true;
-                        }
-                    } catch(e) {}
-                    if (isGoogle) {
-                        throw new DOMException("The operation is not supported.", "NotSupportedError");
-                    }
-                }
-                // For Google Identity (GIS) / session prefetch / FedCM or normal credentials:
-                try {
-                    return await origGet(options);
-                } catch(e) {
-                    return null;
-                }
-            };
-        }
-    })();
-    """
-
-    static var userScript: WKUserScript {
-        WKUserScript(
-            source: scriptSource,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
-        )
-    }
-}
-
 // MARK: - Google Dropdown & Modal Stability Script Helper
 
 @MainActor
@@ -338,7 +292,6 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
         config.defaultWebpagePreferences.allowsContentJavaScript = true
         config.allowsAirPlayForMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
-        config.userContentController.addUserScript(WebAuthnScriptHelper.userScript)
         config.userContentController.addUserScript(BackgroundAudioScriptHelper.userScript)
         config.userContentController.addUserScript(GoogleDropdownScriptHelper.userScript)
 
@@ -351,7 +304,8 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
         if #available(macOS 13.3, *) {
             wv.isInspectable = true
         }
-        wv.customUserAgent = userAgent
+        let initialUA = Self.userAgent(for: defaultURL, fallback: userAgent)
+        wv.customUserAgent = initialUA
         wv.allowsBackForwardNavigationGestures = true
         self.webView = wv
 
@@ -400,12 +354,34 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
         wv.load(URLRequest(url: defaultURL))
     }
 
+    static func userAgent(for url: URL?, fallback: String) -> String {
+        guard let host = url?.host?.lowercased() else { return fallback }
+        // Google authentication (accounts.google.com) requires genuine Safari desktop UA
+        // so Google invokes Apple's native iCloud Keychain / Touch ID Passkey modal sheet
+        // instead of expecting Chrome proprietary Credential Manager extensions.
+        if host.contains("accounts.google.com") || host.contains("myaccount.google.com") {
+            return WebTabItem.safariUserAgent
+        }
+        if host.contains("slack.com") || host.contains("whatsapp.com") || host.contains("chat.google.com") {
+            return WebTabItem.chromeUserAgent
+        }
+        return fallback
+    }
+
+    func updateUserAgent(for url: URL?) {
+        let ua = Self.userAgent(for: url, fallback: self.userAgent)
+        if let wv = webView, wv.customUserAgent != ua {
+            wv.customUserAgent = ua
+        }
+    }
+
     func reload() {
         webView?.reload()
     }
 
     func load(url: URL) {
         currentURL = url
+        updateUserAgent(for: url)
         webView?.load(URLRequest(url: url))
     }
 
@@ -472,6 +448,7 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         isLoading = true
+        updateUserAgent(for: webView.url)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -517,6 +494,8 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
             decisionHandler(.allow)
             return
         }
+
+        updateUserAgent(for: url)
 
         // New window/tab requested (target="_blank" or window.open)
         if navigationAction.targetFrame == nil {

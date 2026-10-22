@@ -123,7 +123,6 @@ final class WebTabItem: NSObject, ObservableObject, Identifiable, WKNavigationDe
         config.defaultWebpagePreferences.allowsContentJavaScript = true
         config.allowsAirPlayForMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
-        config.userContentController.addUserScript(WebAuthnScriptHelper.userScript)
         config.userContentController.addUserScript(BackgroundAudioScriptHelper.userScript)
         config.userContentController.addUserScript(GoogleDropdownScriptHelper.userScript)
 

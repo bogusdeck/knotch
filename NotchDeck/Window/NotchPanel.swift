@@ -102,6 +102,9 @@ final class NotchPanel: NSPanel {
             if !isKeyWindow {
                 makeKey()
             }
+            if !isMainWindow {
+                makeMain()
+            }
             if !NSApp.isActive {
                 NSApp.activate(ignoringOtherApps: true)
             }

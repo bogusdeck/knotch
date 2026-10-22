@@ -377,6 +377,7 @@ final class NotchPanelController: NSObject {
         NSApp.setActivationPolicy(.regular)
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         panel.makeKeyAndOrderFront(nil)
+        panel.makeMain()
         NSApp.activate(ignoringOtherApps: true)
 
         startOutsideClickMonitor()
