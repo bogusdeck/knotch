@@ -357,7 +357,7 @@ struct ExpandedView: View {
                     icon: "number",
                     brandColor: Color(red: 0.88, green: 0.15, blue: 0.44),
                     defaultURL: URL(string: "https://app.slack.com/client")!,
-                    userAgent: WebTabItem.chromeUserAgent,
+                    userAgent: WebTabItem.safariUserAgent,
                     viewModel: viewModel
                 )
             case .shelf:

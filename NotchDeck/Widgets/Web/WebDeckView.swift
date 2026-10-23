@@ -41,8 +41,8 @@ final class WebTabItem: NSObject, ObservableObject, Identifiable, WKNavigationDe
         guard let host = url?.host?.lowercased() else {
             return safariUserAgent
         }
-        // Slack, WhatsApp, and Google Chat web clients require Chromium UA
-        if host.contains("slack.com") || host.contains("whatsapp.com") || host.contains("chat.google.com") {
+        // WhatsApp and Google Chat web clients require Chromium UA
+        if host.contains("whatsapp.com") || host.contains("chat.google.com") {
             return chromeUserAgent
         }
         // Google Search and general web use genuine Safari desktop UA

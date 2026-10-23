@@ -360,13 +360,13 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
 
     static func userAgent(for url: URL?, fallback: String) -> String {
         guard let host = url?.host?.lowercased() else { return fallback }
-        // Google authentication (accounts.google.com) requires genuine Safari desktop UA
-        // so Google invokes Apple's native iCloud Keychain / Touch ID Passkey modal sheet
-        // instead of expecting Chrome proprietary Credential Manager extensions.
-        if host.contains("accounts.google.com") || host.contains("myaccount.google.com") {
+        // Slack and Google Account sign-in require genuine Safari desktop UA.
+        // Slack actively detects WebKit engine mismatches when Chrome UA is spoofed and
+        // redirects to slack.com/unsupported-browser.
+        if host.contains("slack.com") || host.contains("accounts.google.com") || host.contains("myaccount.google.com") {
             return WebTabItem.safariUserAgent
         }
-        if host.contains("slack.com") || host.contains("whatsapp.com") || host.contains("chat.google.com") {
+        if host.contains("whatsapp.com") || host.contains("chat.google.com") {
             return WebTabItem.chromeUserAgent
         }
         return fallback
