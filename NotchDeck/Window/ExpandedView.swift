@@ -124,13 +124,18 @@ struct ExpandedView: View {
         return items
     }
 
+    private var notchCutoutWidth: CGFloat {
+        max(viewModel.geometry.notchFrame.width + 16, 175)
+    }
+
     private var leftTabs: [TabItemModel] {
-        let split = (allTabItems.count + 1) / 2
+        // Balance left vs right accounting for the Settings button on the left
+        let split = allTabItems.count / 2
         return Array(allTabItems.prefix(split))
     }
 
     private var rightTabs: [TabItemModel] {
-        let split = (allTabItems.count + 1) / 2
+        let split = allTabItems.count / 2
         return Array(allTabItems.dropFirst(split))
     }
 
@@ -151,7 +156,7 @@ struct ExpandedView: View {
                         .foregroundStyle(isNotchHovered ? currentTheme.secondaryText : currentTheme.tertiaryText)
                 }
             }
-            .frame(width: max(viewModel.geometry.notchFrame.width + 16, 175))
+            .frame(width: notchCutoutWidth)
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
         }
@@ -174,66 +179,79 @@ struct ExpandedView: View {
     }
 
     private var normalTabBar: some View {
-        HStack(spacing: 0) {
-            // Left top corner: Settings button on the leftmost side + Left tabs (Home, Notes, Shelf)
-            HStack(spacing: 5) {
-                SettingsButton(isLight: currentTheme.isLight) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewModel.isSettingsActive = true
+        ZStack(alignment: .center) {
+            // Left & Right tab bars with center spacer
+            HStack(spacing: 0) {
+                // Left top corner: Settings button on the leftmost side + Left tabs (Home, Notes, Shelf)
+                HStack(spacing: 5) {
+                    SettingsButton(isLight: currentTheme.isLight) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.isSettingsActive = true
+                        }
+                    }
+                    .padding(.trailing, 2)
+
+                    ForEach(leftTabs) { item in
+                        renderTabButton(item)
                     }
                 }
-                .padding(.trailing, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                ForEach(leftTabs) { item in
-                    renderTabButton(item)
+                // Spacer reserving the center notch area so tabs never overlap the notch
+                Color.clear
+                    .frame(width: notchCutoutWidth)
+
+                // Right tabs (Terminal, VPN, etc.)
+                HStack(spacing: 4) {
+                    ForEach(rightTabs) { item in
+                        renderTabButton(item)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
 
-            // Center Notch cutout — matches hardware notch, clicking closes!
+            // Center Notch cutout — perfectly centered in the window, exactly aligning with the physical notch!
             notchCenterCutout
-
-            // Right tabs (Terminal, VPN, etc.)
-            HStack(spacing: 4) {
-                ForEach(rightTabs) { item in
-                    renderTabButton(item)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 8)
         .frame(height: max(viewModel.geometry.notchFrame.height, 30))
     }
 
     private var settingsTabBar: some View {
-        HStack(spacing: 0) {
-            // Left top corner: Back button + Left settings category tabs
-            HStack(spacing: 5) {
-                SettingsBackButton(isLight: currentTheme.isLight) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewModel.isSettingsActive = false
+        ZStack(alignment: .center) {
+            HStack(spacing: 0) {
+                // Left top corner: Back button + Left settings category tabs
+                HStack(spacing: 5) {
+                    SettingsBackButton(isLight: currentTheme.isLight) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.isSettingsActive = false
+                        }
+                    }
+                    .padding(.trailing, 2)
+
+                    ForEach(leftSettingsCategories) { category in
+                        settingsCategoryTabButton(category)
                     }
                 }
-                .padding(.trailing, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                ForEach(leftSettingsCategories) { category in
-                    settingsCategoryTabButton(category)
+                // Center spacer
+                Color.clear
+                    .frame(width: notchCutoutWidth)
+
+                // Right side: Right settings category tabs
+                HStack(spacing: 4) {
+                    ForEach(rightSettingsCategories) { category in
+                        settingsCategoryTabButton(category)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
 
-            // Center Notch cutout — matches hardware notch, clicking closes!
+            // Center Notch cutout — perfectly centered in the window
             notchCenterCutout
-
-            // Right side: Right settings category tabs
-            HStack(spacing: 4) {
-                ForEach(rightSettingsCategories) { category in
-                    settingsCategoryTabButton(category)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 8)
         .frame(height: max(viewModel.geometry.notchFrame.height, 30))
     }
 
