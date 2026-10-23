@@ -366,7 +366,7 @@ final class NotchPanelController: NSObject {
             previousFrontmostApp = frontApp
         }
 
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.84)) {
             viewModel.state = .expanded
         }
         resizePanel(for: .expanded, animated: true)
@@ -393,7 +393,7 @@ final class NotchPanelController: NSObject {
         peekTimer?.cancel()
         stopOutsideClickMonitor()
 
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
             viewModel.state = .collapsed
             viewModel.isSettingsActive = false
             viewModel.isTerminalZoomed = false
@@ -416,7 +416,7 @@ final class NotchPanelController: NSObject {
     func peek() {
         guard viewModel.state == .collapsed else { return }
         logger.debug("→ peek")
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
             viewModel.state = .peek
         }
         resizePanel(for: .peek, animated: true)
@@ -444,10 +444,22 @@ final class NotchPanelController: NSObject {
         let targetFrame = panelFrame(for: state)
 
         if animated {
-            let duration: TimeInterval = (state == .expanded) ? 0.36 : 0.32
+            let duration: TimeInterval
+            let timingFunction: CAMediaTimingFunction
+            switch state {
+            case .expanded:
+                duration = 0.38
+                timingFunction = CAMediaTimingFunction(controlPoints: 0.18, 1.0, 0.32, 1.0)
+            case .collapsed:
+                duration = 0.34
+                timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.42, 1.0)
+            case .peek:
+                duration = 0.32
+                timingFunction = CAMediaTimingFunction(controlPoints: 0.18, 1.0, 0.32, 1.0)
+            }
             NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration          = duration
-                ctx.timingFunction    = CAMediaTimingFunction(controlPoints: 0.16, 1.0, 0.3, 1.0)
+                ctx.timingFunction    = timingFunction
                 ctx.allowsImplicitAnimation = true
                 panel.animator().setFrame(targetFrame, display: true)
             } completionHandler: { [weak self] in

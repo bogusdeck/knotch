@@ -274,7 +274,7 @@ struct ExpandedView: View {
                     isSelected: viewModel.activeCustomTabId == nil && viewModel.activeTab == tab,
                     isLight: currentTheme.isLight
                 ) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
                         viewModel.activeCustomTabId = nil
                         viewModel.activeTab = tab
                     }
@@ -287,7 +287,7 @@ struct ExpandedView: View {
                 isSelected: viewModel.activeCustomTabId == item.id,
                 isLight: currentTheme.isLight
             ) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
                     viewModel.activeCustomTabId = item.id
                 }
             }

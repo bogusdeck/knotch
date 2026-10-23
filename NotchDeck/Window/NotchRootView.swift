@@ -63,7 +63,7 @@ struct NotchRootView: View {
             viewModel.requestCollapse()
             return .handled
         }
-        .animation(.spring(response: 0.36, dampingFraction: 0.82), value: viewModel.state)
+        .animation(.spring(response: 0.38, dampingFraction: 0.84), value: viewModel.state)
         .environment(\.deckTheme, currentTheme)
     }
 
@@ -162,10 +162,7 @@ struct NotchRootView: View {
             )
             .opacity(viewModel.state == .expanded ? 1 : 0)
             .allowsHitTesting(viewModel.state == .expanded)
-            .frame(
-                width: viewModel.state == .expanded ? nil : 0,
-                height: viewModel.state == .expanded ? nil : 0
-            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
 
             if viewModel.state == .collapsed {
