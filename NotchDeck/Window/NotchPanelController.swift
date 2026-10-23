@@ -801,23 +801,6 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
         ])
     }
 
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        guard let controller = panelController else { return super.hitTest(point) }
-
-        // If collapsed or peeking, strictly restrict hit-testing to the active notch/panel frame in screen coordinates.
-        // Clicks outside the hardware notch (e.g. nearby menu bar items or desktop) pass right through to underlying apps!
-        if controller.viewModel.state == .collapsed || controller.viewModel.state == .peek {
-            guard let window = self.window else { return nil }
-            let rectInWindow = convert(NSRect(origin: point, size: .zero), to: nil)
-            let screenPoint = window.convertToScreen(rectInWindow).origin
-            let targetFrame = controller.panelFrame(for: controller.viewModel.state)
-            if !targetFrame.contains(screenPoint) {
-                return nil
-            }
-        }
-        return super.hitTest(point)
-    }
-
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")

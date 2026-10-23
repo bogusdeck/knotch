@@ -122,6 +122,11 @@ final class NotchPanel: NSPanel {
             if !NSApp.isActive {
                 NSApp.activate(ignoringOtherApps: true)
             }
+            if let controller = delegate as? NotchPanelController,
+               controller.viewModel.state == .collapsed || controller.viewModel.state == .peek {
+                controller.expand()
+                return
+            }
         }
         super.sendEvent(event)
     }
