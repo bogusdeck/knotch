@@ -258,13 +258,15 @@ struct ExpandedView: View {
                 Color.clear
                     .frame(width: notchCutoutWidth)
 
-                // Right tabs (Terminal, VPN, etc.) + Work Mode Toggle
+                // Right tabs (Terminal, VPN, etc.) + Work Mode Toggle + Quit App Cross Button
                 HStack(spacing: 5) {
                     ForEach(rightTabs) { item in
                         renderTabButton(item)
                     }
 
                     workModeToggle
+
+                    quitAppButton
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -321,6 +323,33 @@ struct ExpandedView: View {
         .help(viewModel.isWorkMode ? "Work Mode Active (Google Chat enabled) — Click for Personal Mode" : "Personal Mode Active (WhatsApp enabled) — Click for Work Mode")
     }
 
+    private var quitAppButton: some View {
+        Button {
+            NSApp.terminate(nil)
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(isQuitHovered ? Color(red: 0.95, green: 0.22, blue: 0.22) : Color.white.opacity(0.08))
+                    .frame(width: 19, height: 19)
+
+                Image(systemName: "xmark")
+                    .font(.system(size: 8.5, weight: .bold))
+                    .foregroundStyle(isQuitHovered ? Color.white : currentTheme.secondaryText)
+            }
+            .frame(width: 22, height: 22)
+            .contentShape(Circle())
+            .overlay(
+                Circle()
+                    .stroke(isQuitHovered ? Color.red.opacity(0.8) : Color.white.opacity(0.12), lineWidth: 0.8)
+            )
+            .shadow(color: isQuitHovered ? Color.red.opacity(0.45) : Color.clear, radius: 4, y: 1)
+        }
+        .buttonStyle(.plain)
+        .pointingHandCursor()
+        .onHover { isQuitHovered = $0 }
+        .help("Quit NotchDeck (Stop Application)")
+    }
+
     private var settingsTabBar: some View {
         ZStack(alignment: .center) {
             HStack(spacing: 0) {
@@ -343,11 +372,13 @@ struct ExpandedView: View {
                 Color.clear
                     .frame(width: notchCutoutWidth)
 
-                // Right side: Right settings category tabs
-                HStack(spacing: 4) {
+                // Right side: Right settings category tabs + Quit App Cross Button
+                HStack(spacing: 5) {
                     ForEach(rightSettingsCategories) { category in
                         settingsCategoryTabButton(category)
                     }
+
+                    quitAppButton
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
