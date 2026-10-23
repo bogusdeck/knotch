@@ -50,5 +50,16 @@
     <string>NotchDeck uses your location for location-based web services.</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>NotchDeck connects with external FIDO2 / Passkey security authenticators via Bluetooth.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.notchdeck.googlechat-auth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>notchdeck-googlechat</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

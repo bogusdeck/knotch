@@ -3,6 +3,7 @@
 // Features shared WKProcessPool for minimal RAM usage, lazy loading, and in-notch zoom.
 
 import AppKit
+import AuthenticationServices
 import AVFoundation
 import SwiftUI
 import WebKit
@@ -210,7 +211,10 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
     @Published var pageTitle: String = ""
     @Published var micStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
     @Published var unreadCount: Int = 0
+    @Published var isAuthenticating: Bool = false
 
+    private var authSession: ASWebAuthenticationSession?
+    private var authAnchorProvider: _ASAnchorProvider?
     private var progressObs: NSKeyValueObservation?
     private var titleObs: NSKeyValueObservation?
     private var urlObs: NSKeyValueObservation?
@@ -366,6 +370,48 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
             return WebTabItem.chromeUserAgent
         }
         return fallback
+    }
+
+    // MARK: - Google Sign-In via ASWebAuthenticationSession (Option B)
+
+    /// Opens a Safari-backed ASWebAuthenticationSession for Google Sign-In.
+    /// This gives full Touch ID / Passkey / iCloud Keychain access, bypassing WKWebView's
+    /// limited WebAuthn support. After auth completes, session cookies flow into the shared
+    /// WKWebsiteDataStore.default() which WKWebView already uses — so a simple reload works.
+    func signInWithGoogle(anchor: NSWindow) {
+        var components = URLComponents(string: "https://accounts.google.com/signin/v2/identifier")!
+        components.queryItems = [
+            URLQueryItem(name: "service", value: "dynamite"),
+            URLQueryItem(name: "Email", value: "tanish.vashisth@cdadebate.com"),
+            URLQueryItem(name: "continue", value: "https://chat.google.com"),
+            URLQueryItem(name: "flowName", value: "WebLiteSignIn"),
+            URLQueryItem(name: "flowEntry", value: "ServiceLogin"),
+        ]
+        guard let authURL = components.url else { return }
+
+        let session = ASWebAuthenticationSession(
+            url: authURL,
+            callbackURLScheme: "notchdeck-googlechat"
+        ) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.isAuthenticating = false
+                self?.authSession = nil
+                self?.authAnchorProvider = nil
+                // After Safari auth session closes, cookies are shared via WKWebsiteDataStore.default()
+                self?.load(url: URL(string: "https://chat.google.com")!)
+            }
+        }
+        // Share the Safari cookie jar so WKWebView picks up the session automatically
+        session.prefersEphemeralWebBrowserSession = false
+
+        let provider = _ASAnchorProvider(window: anchor)
+        session.presentationContextProvider = provider
+        // Keep the provider alive for the lifetime of the auth session
+        authAnchorProvider = provider
+
+        authSession = session
+        isAuthenticating = true
+        session.start()
     }
 
     func updateUserAgent(for url: URL?) {
@@ -666,6 +712,19 @@ extension DedicatedWebModel: WKScriptMessageHandler {
     }
 }
 
+// MARK: - ASWebAuthenticationSession Anchor Provider
+
+/// Retained for the lifetime of the ASWebAuthenticationSession.
+/// Associates the NSWindow as the presentation anchor so the auth sheet
+/// correctly attaches to the NotchDeck panel.
+private final class _ASAnchorProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    let window: NSWindow
+    init(window: NSWindow) { self.window = window }
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        window
+    }
+}
+
 // MARK: - DedicatedWebView (SwiftUI)
 
 struct DedicatedWebView: View {
@@ -785,16 +844,24 @@ struct DedicatedWebView: View {
                 .help(model.micStatus == .authorized ? "Microphone Access Granted" : (model.micStatus == .denied ? "Microphone Denied (Click to open System Settings)" : "Click to grant Microphone access"))
 
                 // Quick Switch to tanish.vashisth@cdadebate.com for Google Chat
+                // Uses ASWebAuthenticationSession (Option B) for full Touch ID / Passkey support
                 if id == "googlechat" {
                     Button {
-                        if let url = URL(string: "https://accounts.google.com/AccountChooser?service=dynamite&Email=tanish.vashisth@cdadebate.com&continue=https://chat.google.com") {
-                            model.load(url: url)
+                        let anchor = NSApp.keyWindow ?? NSApp.mainWindow
+                        if let anchor {
+                            model.signInWithGoogle(anchor: anchor)
                         }
                     } label: {
                         HStack(spacing: 3) {
-                            Image(systemName: "person.crop.circle.badge.checkmark")
-                                .font(.system(size: 9, weight: .bold))
-                            Text("tanish.vashisth@cdadebate.com")
+                            if model.isAuthenticating {
+                                ProgressView()
+                                    .scaleEffect(0.55)
+                                    .frame(width: 11, height: 11)
+                            } else {
+                                Image(systemName: "person.crop.circle.badge.checkmark")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            Text(model.isAuthenticating ? "Signing in…" : "tanish.vashisth@cdadebate.com")
                                 .font(.system(size: 9.5, weight: .medium, design: .rounded))
                                 .lineLimit(1)
                         }
@@ -846,9 +913,10 @@ struct DedicatedWebView: View {
                 // More Menu
                 Menu {
                     if id == "googlechat" {
-                        Button("Sign in / Switch to tanish.vashisth@cdadebate.com") {
-                            if let url = URL(string: "https://accounts.google.com/AccountChooser?service=dynamite&Email=tanish.vashisth@cdadebate.com&continue=https://chat.google.com") {
-                                model.load(url: url)
+                        Button("Sign in with Google (Touch ID / Passkey)") {
+                            let anchor = NSApp.keyWindow ?? NSApp.mainWindow
+                            if let anchor {
+                                model.signInWithGoogle(anchor: anchor)
                             }
                         }
                         Divider()
