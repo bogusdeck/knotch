@@ -69,15 +69,17 @@ final class TerminalSession: NSObject, Identifiable, ObservableObject, LocalProc
         env["TERM"] = "xterm-256color"
         env["COLORTERM"] = "truecolor"
         env["LANG"] = "en_US.UTF-8"
+        let localBin = "\(homeDir)/.local/bin"
+        let goBin = "\(homeDir)/go/bin"
+        let standardPaths = [localBin, goBin, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
         if let currentPath = env["PATH"] {
-            let standardPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
             var parts = currentPath.split(separator: ":").map(String.init)
-            for p in standardPaths where !parts.contains(p) {
-                parts.append(p)
+            for p in standardPaths.reversed() where !parts.contains(p) {
+                parts.insert(p, at: 0)
             }
             env["PATH"] = parts.joined(separator: ":")
         } else {
-            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            env["PATH"] = standardPaths.joined(separator: ":")
         }
         let envList = env.map { "\($0.key)=\($0.value)" }
 

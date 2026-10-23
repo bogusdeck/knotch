@@ -95,7 +95,7 @@ struct ExpandedView: View {
                 items.append(TabItemModel(id: "googlechat", title: "Chat", iconName: "bubble.left.and.bubble.right.fill", builtInTab: .googlechat))
             case "whatsapp":
                 items.append(TabItemModel(id: "whatsapp", title: "WhatsApp", iconName: "message.fill", builtInTab: .whatsapp))
-            case "slack":
+            case "slack", "slackterm", "slack-term":
                 items.append(TabItemModel(id: "slack", title: "Slack", iconName: "number", builtInTab: .slack))
             case "holder":
                 items.append(TabItemModel(id: "holder", title: "Holder", iconName: "macwindow.on.rectangle", builtInTab: .holder))
@@ -351,15 +351,7 @@ struct ExpandedView: View {
                     viewModel: viewModel
                 )
             case .slack:
-                DedicatedWebView(
-                    id: "slack",
-                    title: "Slack",
-                    icon: "number",
-                    brandColor: Color(red: 0.88, green: 0.15, blue: 0.44),
-                    defaultURL: URL(string: "https://app.slack.com/client")!,
-                    userAgent: WebTabItem.chromeUserAgent,
-                    viewModel: viewModel
-                )
+                SlackTermView(viewModel: viewModel)
             case .shelf:
                 ShelfView(shelfManager: shelfManager, copyOnDrop: configManager.config.general.copyOnDrop)
             case .terminal:
