@@ -258,6 +258,10 @@ struct NotchRootView: View {
             Button("Expand Notch") {
                 viewModel.requestExpand()
             }
+            Divider()
+            Button("Quit NotchDeck") {
+                NSApp.terminate(nil)
+            }
         }
     }
 

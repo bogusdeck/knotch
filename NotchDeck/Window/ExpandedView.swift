@@ -18,6 +18,7 @@ struct ExpandedView: View {
     @ObservedObject var widgetRegistry: WidgetRegistry
 
     @State private var isNotchHovered: Bool = false
+    @State private var isQuitHovered: Bool = false
     @State private var isExpandedDropTargeted: Bool = false
 
     private var currentTheme: DeckTheme {
@@ -164,33 +165,65 @@ struct ExpandedView: View {
     }
 
     private var notchCenterCutout: some View {
-        Button {
-            viewModel.requestCollapse()
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isNotchHovered ? currentTheme.tabHover : Color.clear)
+        ZStack {
+            // Main notch area: click to collapse drawer
+            Button {
+                viewModel.requestCollapse()
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isNotchHovered ? currentTheme.tabHover : Color.clear)
 
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.compact.up")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(isNotchHovered ? currentTheme.primaryText.opacity(0.8) : currentTheme.secondaryText)
-                    Text("notch")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(isNotchHovered ? currentTheme.secondaryText : currentTheme.tertiaryText)
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.compact.up")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(isNotchHovered ? currentTheme.primaryText.opacity(0.8) : currentTheme.secondaryText)
+                        Text("notch")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundStyle(isNotchHovered ? currentTheme.secondaryText : currentTheme.tertiaryText)
+                    }
                 }
+                .frame(width: notchCutoutWidth)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .pointingHandCursor()
+            .onHover { hovering in
+                isNotchHovered = hovering
+            }
+            .help("Click notch to close (ESC)")
+
+            // Cross button: Stop/quit the whole application
+            HStack {
+                Spacer()
+
+                Button {
+                    NSApp.terminate(nil)
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(isQuitHovered ? Color.red.opacity(0.2) : Color.white.opacity(0.08))
+                            .frame(width: 17, height: 17)
+
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(isQuitHovered ? Color(red: 1.0, green: 0.35, blue: 0.35) : currentTheme.secondaryText)
+                    }
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+                .onHover { hovering in
+                    isQuitHovered = hovering
+                }
+                .help("Stop / Quit NotchDeck Application")
+                .padding(.trailing, 4)
             }
             .frame(width: notchCutoutWidth)
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .contentShape(Rectangle())
-        .pointingHandCursor()
-        .onHover { hovering in
-            isNotchHovered = hovering
-        }
-        .help("Click notch to close")
+        .frame(width: notchCutoutWidth)
     }
 
     @ViewBuilder
