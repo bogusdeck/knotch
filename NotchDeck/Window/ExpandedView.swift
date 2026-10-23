@@ -83,7 +83,31 @@ struct ExpandedView: View {
     }
 
     private var allTabItems: [TabItemModel] {
-        let configured = configManager.config.layout.tabs
+        let layout = configManager.config.layout
+        let configured: [String]
+
+        if viewModel.isWorkMode {
+            if let customWork = layout.workTabs, !customWork.isEmpty {
+                configured = customWork
+            } else {
+                // In Work mode: Google Chat and other work tools are visible; personal messaging (WhatsApp) is hidden
+                configured = layout.tabs.filter { id in
+                    let lower = id.lowercased()
+                    return lower != "whatsapp"
+                }
+            }
+        } else {
+            if let customPersonal = layout.personalTabs, !customPersonal.isEmpty {
+                configured = customPersonal
+            } else {
+                // In Personal mode: WhatsApp is visible; work-specific chat (Google Chat) is hidden
+                configured = layout.tabs.filter { id in
+                    let lower = id.lowercased()
+                    return lower != "googlechat" && lower != "gchat" && lower != "chat"
+                }
+            }
+        }
+
         var items: [TabItemModel] = []
         for tabId in configured {
             switch tabId {
@@ -201,11 +225,13 @@ struct ExpandedView: View {
                 Color.clear
                     .frame(width: notchCutoutWidth)
 
-                // Right tabs (Terminal, VPN, etc.)
-                HStack(spacing: 4) {
+                // Right tabs (Terminal, VPN, etc.) + Work Mode Toggle
+                HStack(spacing: 5) {
                     ForEach(rightTabs) { item in
                         renderTabButton(item)
                     }
+
+                    workModeToggle
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -215,6 +241,51 @@ struct ExpandedView: View {
             notchCenterCutout
         }
         .frame(height: max(viewModel.geometry.notchFrame.height, 30))
+    }
+
+    private var workModeToggle: some View {
+        Button {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                let available = allTabItems.compactMap(\.builtInTab)
+                viewModel.toggleWorkMode(availableTabs: available)
+            }
+        } label: {
+            HStack(spacing: 3.5) {
+                Image(systemName: viewModel.isWorkMode ? "briefcase.fill" : "person.crop.circle")
+                    .font(.system(size: 9.5, weight: .bold))
+
+                Text(viewModel.isWorkMode ? "Work" : "Personal")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(viewModel.isWorkMode ? Color.white : currentTheme.secondaryText)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3.5)
+            .background(
+                Capsule()
+                    .fill(
+                        viewModel.isWorkMode
+                            ? AnyShapeStyle(LinearGradient(
+                                colors: [Color(red: 0.16, green: 0.48, blue: 0.98), Color(red: 0.10, green: 0.36, blue: 0.90)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            : AnyShapeStyle(Color.white.opacity(0.08))
+                    )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        viewModel.isWorkMode
+                            ? Color.blue.opacity(0.5)
+                            : Color.white.opacity(0.12),
+                        lineWidth: 0.8
+                    )
+            )
+            .shadow(color: viewModel.isWorkMode ? Color.blue.opacity(0.35) : Color.clear, radius: 4, y: 1)
+        }
+        .buttonStyle(.plain)
+        .pointingHandCursor()
+        .help(viewModel.isWorkMode ? "Work Mode Active (Google Chat enabled) — Click for Personal Mode" : "Personal Mode Active (WhatsApp enabled) — Click for Work Mode")
     }
 
     private var settingsTabBar: some View {

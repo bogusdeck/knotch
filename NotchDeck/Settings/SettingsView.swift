@@ -414,6 +414,19 @@ struct NotchSettingsContentView: View {
 
     private var layoutSection: some View {
         VStack(spacing: 12) {
+            SettingsCard(title: "Work Mode & Tabs", icon: "briefcase") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Work Mode Enabled by Default", isOn: $draftConfig.layout.workMode)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .toggleStyle(.switch)
+
+                    Text("When Work Mode is active, work apps (Google Chat) are displayed and personal apps (WhatsApp) are hidden. You can also toggle this instantly at any time via the Work/Personal pill in the drawer top header.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+            }
+
             SettingsCard(title: "Active Notch Tabs", icon: "tray.2") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Tabs currently enabled in top bar:")

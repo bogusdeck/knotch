@@ -44,6 +44,17 @@ enum TOMLSerializer {
         lines.append("tabs = [\(tabsJoined)]")
         let homeJoined = config.layout.home.map { "\"\($0)\"" }.joined(separator: ", ")
         lines.append("home = [\(homeJoined)]")
+        if let workTabs = config.layout.workTabs {
+            let joined = workTabs.map { "\"\($0)\"" }.joined(separator: ", ")
+            lines.append("work_tabs = [\(joined)]")
+        }
+        if let personalTabs = config.layout.personalTabs {
+            let joined = personalTabs.map { "\"\($0)\"" }.joined(separator: ", ")
+            lines.append("personal_tabs = [\(joined)]")
+        }
+        if config.layout.workMode {
+            lines.append("work_mode = true")
+        }
         lines.append("")
 
         // [[widgets]]

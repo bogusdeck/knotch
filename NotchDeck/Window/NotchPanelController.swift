@@ -50,6 +50,9 @@ final class NotchPanelController: NSObject {
         self.geometry      = NotchGeometryDetector.detect()
         self.panel         = NotchPanel()
         self.viewModel     = NotchViewModel(geometry: geometry)
+        if UserDefaults.standard.object(forKey: "NotchDeckWorkMode") == nil {
+            self.viewModel.isWorkMode = configManager.config.layout.workMode
+        }
         super.init()
 
         viewModel.onExpandRequested = { [weak self] in

@@ -53,6 +53,9 @@ struct AppearanceConfig: Sendable, Equatable {
 struct LayoutConfig: Sendable, Equatable {
     var tabs: [String] = ["home", "notes", "googlechat", "whatsapp", "slack", "web", "terminal", "vpn"]
     var home: [String] = ["media", "clock", "calendar", "vpn-status"]
+    var workTabs: [String]? = nil
+    var personalTabs: [String]? = nil
+    var workMode: Bool = false
 
     static let `default` = LayoutConfig()
 }

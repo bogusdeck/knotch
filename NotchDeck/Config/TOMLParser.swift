@@ -90,6 +90,17 @@ enum TOMLParser {
             let items = array.compactMap(\.string)
             if !items.isEmpty { layout.home = items }
         }
+        if let array = table["work_tabs"]?.array {
+            let items = array.compactMap(\.string)
+            if !items.isEmpty { layout.workTabs = items }
+        }
+        if let array = table["personal_tabs"]?.array {
+            let items = array.compactMap(\.string)
+            if !items.isEmpty { layout.personalTabs = items }
+        }
+        if let v = table["work_mode"]?.bool {
+            layout.workMode = v
+        }
         return layout
     }
 

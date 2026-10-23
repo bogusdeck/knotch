@@ -21,6 +21,11 @@ final class NotchViewModel: ObservableObject {
     @Published var activeCustomTabId: String? = nil
     @Published var isDraggingOverNotch: Bool = false
 
+    /// Work mode state: when true, work-specific tabs (e.g. Google Chat) are shown and personal tabs (WhatsApp) are hidden.
+    @Published var isWorkMode: Bool = {
+        UserDefaults.standard.bool(forKey: "NotchDeckWorkMode")
+    }()
+
     /// In-notch settings mode state
     @Published var isSettingsActive: Bool = false
     @Published var selectedSettingsCategory: SettingsCategory = .general
@@ -77,6 +82,20 @@ final class NotchViewModel: ObservableObject {
     func toggleWebZoom() {
         isWebZoomed.toggle()
         onWebZoomToggled?()
+    }
+
+    func toggleWorkMode(availableTabs: [NotchTab] = []) {
+        isWorkMode.toggle()
+        UserDefaults.standard.set(isWorkMode, forKey: "NotchDeckWorkMode")
+
+        // Smoothly auto-switch active tab if the current one is hidden in the new mode
+        if isWorkMode && activeTab == .whatsapp {
+            activeTab = availableTabs.contains(.googlechat) ? .googlechat : (availableTabs.first ?? .home)
+        } else if !isWorkMode && activeTab == .googlechat {
+            activeTab = availableTabs.contains(.whatsapp) ? .whatsapp : (availableTabs.first ?? .home)
+        } else if !availableTabs.isEmpty && !availableTabs.contains(activeTab) {
+            activeTab = availableTabs.first ?? .home
+        }
     }
 
     func openSettingsInsideNotch(category: SettingsCategory = .general) {
