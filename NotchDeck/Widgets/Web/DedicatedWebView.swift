@@ -360,13 +360,10 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
 
     static func userAgent(for url: URL?, fallback: String) -> String {
         guard let host = url?.host?.lowercased() else { return fallback }
-        // Slack and Google Account sign-in require genuine Safari desktop UA.
-        // Slack actively detects WebKit engine mismatches when Chrome UA is spoofed and
-        // redirects to slack.com/unsupported-browser.
-        if host.contains("slack.com") || host.contains("accounts.google.com") || host.contains("myaccount.google.com") {
+        if host.contains("accounts.google.com") || host.contains("myaccount.google.com") {
             return WebTabItem.safariUserAgent
         }
-        if host.contains("whatsapp.com") || host.contains("chat.google.com") {
+        if host.contains("slack.com") || host.contains("whatsapp.com") || host.contains("chat.google.com") {
             return WebTabItem.chromeUserAgent
         }
         return fallback
@@ -538,6 +535,16 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
     ) {
         guard let url = navigationAction.request.url else {
             decisionHandler(.allow)
+            return
+        }
+
+        // Prevent and bounce out of Slack unsupported-browser redirect loop
+        if url.absoluteString.contains("unsupported-browser") {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.load(url: self.defaultURL)
+            }
+            decisionHandler(.cancel)
             return
         }
 

@@ -35,14 +35,14 @@ final class WebTabItem: NSObject, ObservableObject, Identifiable, WKNavigationDe
     private var canGoForwardObs: NSKeyValueObservation?
 
     static let safariUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
-    static let chromeUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+    static let chromeUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.8059.85 Safari/537.36"
 
     static func userAgent(for url: URL?) -> String {
         guard let host = url?.host?.lowercased() else {
             return safariUserAgent
         }
-        // WhatsApp and Google Chat web clients require Chromium UA
-        if host.contains("whatsapp.com") || host.contains("chat.google.com") {
+        // Slack, WhatsApp, and Google Chat web clients require modern Chromium UA
+        if host.contains("slack.com") || host.contains("whatsapp.com") || host.contains("chat.google.com") {
             return chromeUserAgent
         }
         // Google Search and general web use genuine Safari desktop UA
