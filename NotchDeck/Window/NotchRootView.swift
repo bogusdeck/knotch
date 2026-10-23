@@ -184,10 +184,13 @@ struct NotchRootView: View {
     }
 
     private var collapsedView: some View {
-        ZStack {
-            // Invisible solid hit target filling the entire panel frame
+        let notchW = viewModel.hasWhatsAppNotification ? viewModel.geometry.notchFrame.width + 10 : viewModel.geometry.notchFrame.width
+        let notchH = viewModel.hasWhatsAppNotification ? viewModel.geometry.notchFrame.height + 4 : viewModel.geometry.notchFrame.height
+
+        return ZStack {
+            // Solid hit target restricted strictly to the notch frame
             Color.black.opacity(0.001)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: notchW, height: notchH)
                 .contentShape(Rectangle())
 
             HStack(spacing: 6) {
@@ -227,11 +230,10 @@ struct NotchRootView: View {
                         .transition(.opacity)
                 }
             }
-            .frame(height: viewModel.geometry.notchFrame.height)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .frame(width: notchW, height: notchH)
+            .padding(.horizontal, 10)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(width: notchW, height: notchH)
         .contentShape(Rectangle())
         .onTapGesture {
             viewModel.requestExpand()
@@ -293,9 +295,7 @@ struct NotchRootView: View {
         .padding(.vertical, 3)
         .background(Color.black.opacity(0.8))
         .cornerRadius(6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .padding(.trailing, 6)
-        .padding(.bottom, 2)
+        .padding(.trailing, 2)
     }
 
     // MARK: - Collapsed Server Status Dot

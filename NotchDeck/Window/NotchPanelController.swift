@@ -224,6 +224,7 @@ final class NotchPanelController: NSObject {
         self.hostingView  = hostingView
         positionPanel()
         panel.orderFrontRegardless()
+        positionPanel()
         installHoverTracking()
         observeScreenChanges()
 
@@ -464,6 +465,7 @@ final class NotchPanelController: NSObject {
                 panel.animator().setFrame(targetFrame, display: true)
             } completionHandler: { [weak self] in
                 Task { @MainActor [weak self] in
+                    self?.panel.setFrame(targetFrame, display: true)
                     self?.installHoverTracking()
                 }
             }
@@ -473,7 +475,7 @@ final class NotchPanelController: NSObject {
         }
     }
 
-    private func panelFrame(for state: NotchState) -> CGRect {
+    func panelFrame(for state: NotchState) -> CGRect {
         let cfg = configManager.config.appearance
         switch state {
         case .collapsed:
@@ -780,6 +782,9 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
 
     @MainActor required init(rootView: Content) {
         super.init(rootView: rootView)
+        if #available(macOS 13.0, *) {
+            self.sizingOptions = []
+        }
         registerForDraggedTypes([
             .fileURL,
             .URL,
@@ -794,6 +799,23 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
             NSPasteboard.PasteboardType("Apple URL pasteboard type"),
             NSPasteboard.PasteboardType("com.apple.pasteboard.promised-file-url")
         ])
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let controller = panelController else { return super.hitTest(point) }
+
+        // If collapsed or peeking, strictly restrict hit-testing to the active notch/panel frame in screen coordinates.
+        // Clicks outside the hardware notch (e.g. nearby menu bar items or desktop) pass right through to underlying apps!
+        if controller.viewModel.state == .collapsed || controller.viewModel.state == .peek {
+            guard let window = self.window else { return nil }
+            let rectInWindow = convert(NSRect(origin: point, size: .zero), to: nil)
+            let screenPoint = window.convertToScreen(rectInWindow).origin
+            let targetFrame = controller.panelFrame(for: controller.viewModel.state)
+            if !targetFrame.contains(screenPoint) {
+                return nil
+            }
+        }
+        return super.hitTest(point)
     }
 
     @available(*, unavailable)

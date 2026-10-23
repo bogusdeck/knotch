@@ -97,6 +97,20 @@ final class NotchPanel: NSPanel {
         frameRect
     }
 
+    // MARK: - Minimum Size Override
+
+    /// Prevents NSHostingView or AppKit from enforcing SwiftUI content fittingSize onto the window minSize,
+    /// ensuring the panel can collapse completely and strictly to the physical notch geometry.
+    override var minSize: NSSize {
+        get { .zero }
+        set { }
+    }
+
+    override var contentMinSize: NSSize {
+        get { .zero }
+        set { }
+    }
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown {
             if !isKeyWindow {
