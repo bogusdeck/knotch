@@ -844,24 +844,16 @@ struct DedicatedWebView: View {
                 .help(model.micStatus == .authorized ? "Microphone Access Granted" : (model.micStatus == .denied ? "Microphone Denied (Click to open System Settings)" : "Click to grant Microphone access"))
 
                 // Quick Switch to tanish.vashisth@cdadebate.com for Google Chat
-                // Uses ASWebAuthenticationSession (Option B) for full Touch ID / Passkey support
                 if id == "googlechat" {
                     Button {
-                        let anchor = NSApp.keyWindow ?? NSApp.mainWindow
-                        if let anchor {
-                            model.signInWithGoogle(anchor: anchor)
+                        if let url = URL(string: "https://accounts.google.com/AccountChooser?service=dynamite&Email=tanish.vashisth@cdadebate.com&continue=https://chat.google.com") {
+                            model.load(url: url)
                         }
                     } label: {
                         HStack(spacing: 3) {
-                            if model.isAuthenticating {
-                                ProgressView()
-                                    .scaleEffect(0.55)
-                                    .frame(width: 11, height: 11)
-                            } else {
-                                Image(systemName: "person.crop.circle.badge.checkmark")
-                                    .font(.system(size: 9, weight: .bold))
-                            }
-                            Text(model.isAuthenticating ? "Signing in…" : "tanish.vashisth@cdadebate.com")
+                            Image(systemName: "person.crop.circle.badge.checkmark")
+                                .font(.system(size: 9, weight: .bold))
+                            Text("tanish.vashisth@cdadebate.com")
                                 .font(.system(size: 9.5, weight: .medium, design: .rounded))
                                 .lineLimit(1)
                         }
@@ -913,10 +905,9 @@ struct DedicatedWebView: View {
                 // More Menu
                 Menu {
                     if id == "googlechat" {
-                        Button("Sign in with Google (Touch ID / Passkey)") {
-                            let anchor = NSApp.keyWindow ?? NSApp.mainWindow
-                            if let anchor {
-                                model.signInWithGoogle(anchor: anchor)
+                        Button("Sign in / Switch to tanish.vashisth@cdadebate.com") {
+                            if let url = URL(string: "https://accounts.google.com/AccountChooser?service=dynamite&Email=tanish.vashisth@cdadebate.com&continue=https://chat.google.com") {
+                                model.load(url: url)
                             }
                         }
                         Divider()
