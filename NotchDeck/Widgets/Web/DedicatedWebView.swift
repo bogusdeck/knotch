@@ -363,7 +363,7 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
         if host.contains("accounts.google.com") || host.contains("myaccount.google.com") {
             return WebTabItem.safariUserAgent
         }
-        if host.contains("slack.com") || host.contains("whatsapp.com") || host.contains("chat.google.com") || host.contains("chatgpt.com") || host.contains("openai.com") || host.contains("claude.ai") || host.contains("anthropic.com") {
+        if host.contains("slack.com") || host.contains("whatsapp.com") || host.contains("chat.google.com") || host.contains("chatgpt.com") || host.contains("openai.com") || host.contains("claude.ai") || host.contains("anthropic.com") || host.contains("deepseek.com") || host.contains("gemini.google.com") {
             return WebTabItem.chromeUserAgent
         }
         return fallback
@@ -564,6 +564,7 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
                host.contains("anthropic.com") ||
                host.contains("claude.ai") ||
                host.contains("appleid.apple.com") ||
+               host.contains("deepseek.com") ||
                (!host.isEmpty && host == (currentURL.host?.lowercased() ?? "")) {
                 webView.load(navigationAction.request)
                 decisionHandler(.cancel)
@@ -599,6 +600,7 @@ final class DedicatedWebModel: NSObject, ObservableObject, WKNavigationDelegate,
                host.contains("anthropic.com") ||
                host.contains("claude.ai") ||
                host.contains("appleid.apple.com") ||
+               host.contains("deepseek.com") ||
                (!host.isEmpty && host == (currentURL.host?.lowercased() ?? "")) {
                 webView.load(navigationAction.request)
                 return nil

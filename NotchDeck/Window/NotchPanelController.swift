@@ -95,7 +95,7 @@ final class NotchPanelController: NSObject {
                 if self.viewModel.isTerminalZoomed && newTab != .terminal {
                     self.viewModel.isTerminalZoomed = false
                 }
-                let isWebTab = newTab == .web || newTab == .whatsapp || newTab == .slack || newTab == .googlechat || newTab == .gpt || newTab == .claude || newTab == .ai
+                let isWebTab = newTab == .web || newTab == .whatsapp || newTab == .slack || newTab == .googlechat || newTab == .gpt || newTab == .claude || newTab == .gemini || newTab == .deepseek || newTab == .ai
                 if self.viewModel.isWebZoomed && !isWebTab {
                     self.viewModel.isWebZoomed = false
                 }
@@ -521,7 +521,7 @@ final class NotchPanelController: NSObject {
                 let maxH = (screen?.visibleFrame.height ?? 800) * 0.82
                 w = min(maxW, 980)
                 h = min(maxH, 640)
-            } else if viewModel.activeTab == .web || viewModel.activeTab == .whatsapp || viewModel.activeTab == .slack || viewModel.activeTab == .googlechat || viewModel.activeTab == .gpt || viewModel.activeTab == .claude || viewModel.activeTab == .ai {
+            } else if viewModel.activeTab == .web || viewModel.activeTab == .whatsapp || viewModel.activeTab == .slack || viewModel.activeTab == .googlechat || viewModel.activeTab == .gpt || viewModel.activeTab == .claude || viewModel.activeTab == .gemini || viewModel.activeTab == .deepseek || viewModel.activeTab == .ai {
                 let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
                 if viewModel.isWebZoomed {
                     let maxW = (screen?.visibleFrame.width ?? 1200) * 0.94
@@ -582,7 +582,7 @@ final class NotchPanelController: NSObject {
             return (540, 230)
         case .shelf:
             return (620, 260)
-        case .web, .whatsapp, .slack, .googlechat, .gpt, .claude, .ai:
+        case .web, .whatsapp, .slack, .googlechat, .gpt, .claude, .gemini, .deepseek, .ai:
             let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
             let maxW = (screen?.visibleFrame.width ?? 1200) * 0.92
             let maxH = (screen?.visibleFrame.height ?? 800) * 0.82

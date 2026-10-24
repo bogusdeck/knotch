@@ -1,12 +1,14 @@
 // AITabView.swift
-// Unified AI Assistant tab for NotchDeck with instant switching between ChatGPT and Claude.
-// Preserves active sessions, chat state, and scroll position across both providers.
+// Unified AI Assistant tab for NotchDeck with instant switching between ChatGPT, Claude, Gemini, and DeepSeek.
+// Preserves active sessions, chat state, and scroll position across all providers.
 
 import SwiftUI
 
 enum AIProvider: String, CaseIterable, Identifiable {
     case gpt = "chatgpt"
     case claude = "claude"
+    case gemini = "gemini"
+    case deepseek = "deepseek"
 
     var id: String { rawValue }
 
@@ -14,6 +16,8 @@ enum AIProvider: String, CaseIterable, Identifiable {
         switch self {
         case .gpt: return "ChatGPT"
         case .claude: return "Claude"
+        case .gemini: return "Gemini"
+        case .deepseek: return "DeepSeek"
         }
     }
 
@@ -21,13 +25,17 @@ enum AIProvider: String, CaseIterable, Identifiable {
         switch self {
         case .gpt: return "sparkles"
         case .claude: return "brain.head.profile"
+        case .gemini: return "sparkle"
+        case .deepseek: return "atom"
         }
     }
 
     var brandColor: Color {
         switch self {
-        case .gpt: return Color(red: 0.06, green: 0.65, blue: 0.52)
-        case .claude: return Color(red: 0.85, green: 0.44, blue: 0.28)
+        case .gpt: return Color(red: 0.06, green: 0.65, blue: 0.52)      // OpenAI Teal
+        case .claude: return Color(red: 0.85, green: 0.44, blue: 0.28)   // Anthropic Terracotta
+        case .gemini: return Color(red: 0.26, green: 0.52, blue: 0.96)   // Google Blue
+        case .deepseek: return Color(red: 0.30, green: 0.45, blue: 1.0)   // DeepSeek Blue
         }
     }
 
@@ -35,6 +43,17 @@ enum AIProvider: String, CaseIterable, Identifiable {
         switch self {
         case .gpt: return URL(string: "https://chatgpt.com")!
         case .claude: return URL(string: "https://claude.ai")!
+        case .gemini: return URL(string: "https://gemini.google.com")!
+        case .deepseek: return URL(string: "https://chat.deepseek.com")!
+        }
+    }
+
+    var hostName: String {
+        switch self {
+        case .gpt: return "chatgpt.com"
+        case .claude: return "claude.ai"
+        case .gemini: return "gemini.google.com"
+        case .deepseek: return "chat.deepseek.com"
         }
     }
 }
@@ -59,15 +78,15 @@ struct AITabView: View {
                             selectedProviderRaw = provider.rawValue
                         }
                     } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Image(systemName: provider.icon)
-                                .font(.system(size: 10.5, weight: .semibold))
+                                .font(.system(size: 10, weight: .semibold))
                             Text(provider.title)
-                                .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
+                                .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
                         }
                         .foregroundStyle(isSelected ? provider.brandColor : theme.secondaryText)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 3.5)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
                                 .fill(isSelected ? provider.brandColor.opacity(0.18) : Color.clear)
@@ -88,7 +107,7 @@ struct AITabView: View {
             )
 
             // Current Host Badge
-            Text(selectedProvider == .gpt ? "chatgpt.com" : "claude.ai")
+            Text(selectedProvider.hostName)
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(theme.tertiaryText)
                 .padding(.horizontal, 6)
@@ -124,6 +143,32 @@ struct AITabView: View {
             )
             .opacity(selectedProvider == .claude ? 1 : 0)
             .allowsHitTesting(selectedProvider == .claude)
+
+            DedicatedWebView(
+                id: "gemini",
+                title: "Gemini",
+                icon: "sparkle",
+                brandColor: Color(red: 0.26, green: 0.52, blue: 0.96),
+                defaultURL: URL(string: "https://gemini.google.com")!,
+                userAgent: WebTabItem.chromeUserAgent,
+                viewModel: viewModel,
+                customHeaderLeading: AnyView(aiPickerHeader)
+            )
+            .opacity(selectedProvider == .gemini ? 1 : 0)
+            .allowsHitTesting(selectedProvider == .gemini)
+
+            DedicatedWebView(
+                id: "deepseek",
+                title: "DeepSeek",
+                icon: "atom",
+                brandColor: Color(red: 0.30, green: 0.45, blue: 1.0),
+                defaultURL: URL(string: "https://chat.deepseek.com")!,
+                userAgent: WebTabItem.chromeUserAgent,
+                viewModel: viewModel,
+                customHeaderLeading: AnyView(aiPickerHeader)
+            )
+            .opacity(selectedProvider == .deepseek ? 1 : 0)
+            .allowsHitTesting(selectedProvider == .deepseek)
         }
     }
 }

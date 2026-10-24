@@ -126,6 +126,10 @@ struct ExpandedView: View {
                 items.append(TabItemModel(id: "gpt", title: "ChatGPT", iconName: "sparkles", builtInTab: .gpt))
             case "claude", "anthropic":
                 items.append(TabItemModel(id: "claude", title: "Claude", iconName: "brain.head.profile", builtInTab: .claude))
+            case "gemini", "google-gemini", "bard":
+                items.append(TabItemModel(id: "gemini", title: "Gemini", iconName: "sparkle", builtInTab: .gemini))
+            case "deepseek", "deepseek-chat":
+                items.append(TabItemModel(id: "deepseek", title: "DeepSeek", iconName: "atom", builtInTab: .deepseek))
             case "slack", "slackterm", "slack-term":
                 items.append(TabItemModel(id: "slack", title: "Slack", iconName: "number", builtInTab: .slack))
             case "holder":
@@ -529,6 +533,26 @@ struct ExpandedView: View {
                     userAgent: WebTabItem.chromeUserAgent,
                     viewModel: viewModel
                 )
+            case .gemini:
+                DedicatedWebView(
+                    id: "gemini",
+                    title: "Gemini",
+                    icon: "sparkle",
+                    brandColor: Color(red: 0.26, green: 0.52, blue: 0.96),
+                    defaultURL: URL(string: "https://gemini.google.com")!,
+                    userAgent: WebTabItem.chromeUserAgent,
+                    viewModel: viewModel
+                )
+            case .deepseek:
+                DedicatedWebView(
+                    id: "deepseek",
+                    title: "DeepSeek",
+                    icon: "atom",
+                    brandColor: Color(red: 0.30, green: 0.45, blue: 1.0),
+                    defaultURL: URL(string: "https://chat.deepseek.com")!,
+                    userAgent: WebTabItem.chromeUserAgent,
+                    viewModel: viewModel
+                )
             case .ai:
                 AITabView(viewModel: viewModel)
             case .slack:
@@ -855,6 +879,8 @@ extension NotchTab {
         case .web:        "Web"
         case .gpt:        "ChatGPT"
         case .claude:     "Claude"
+        case .gemini:     "Gemini"
+        case .deepseek:   "DeepSeek"
         case .ai:         "AI"
         }
     }
@@ -873,6 +899,8 @@ extension NotchTab {
         case .web:        "globe"
         case .gpt:        "sparkles"
         case .claude:     "brain.head.profile"
+        case .gemini:     "sparkle"
+        case .deepseek:   "atom"
         case .ai:         "sparkles"
         }
     }
