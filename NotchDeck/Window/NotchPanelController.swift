@@ -95,7 +95,8 @@ final class NotchPanelController: NSObject {
                 if self.viewModel.isTerminalZoomed && newTab != .terminal {
                     self.viewModel.isTerminalZoomed = false
                 }
-                if self.viewModel.isWebZoomed && newTab != .web {
+                let isWebTab = newTab == .web || newTab == .whatsapp || newTab == .slack || newTab == .googlechat || newTab == .gpt || newTab == .claude
+                if self.viewModel.isWebZoomed && !isWebTab {
                     self.viewModel.isWebZoomed = false
                 }
                 if self.viewModel.state == .expanded {
@@ -520,18 +521,23 @@ final class NotchPanelController: NSObject {
                 let maxH = (screen?.visibleFrame.height ?? 800) * 0.82
                 w = min(maxW, 980)
                 h = min(maxH, 640)
-            } else if viewModel.activeTab == .web {
+            } else if viewModel.activeTab == .web || viewModel.activeTab == .whatsapp || viewModel.activeTab == .slack || viewModel.activeTab == .googlechat || viewModel.activeTab == .gpt || viewModel.activeTab == .claude {
                 let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
                 if viewModel.isWebZoomed {
                     let maxW = (screen?.visibleFrame.width ?? 1200) * 0.94
                     let maxH = (screen?.visibleFrame.height ?? 800) * 0.88
                     w = min(maxW, 1180)
                     h = min(maxH, 760)
-                } else {
+                } else if viewModel.activeTab == .web {
                     let maxW = (screen?.visibleFrame.width ?? 1200) * 0.82
                     let maxH = (screen?.visibleFrame.height ?? 800) * 0.68
                     w = min(maxW, 860)
                     h = min(maxH, 520)
+                } else {
+                    let maxW = (screen?.visibleFrame.width ?? 1200) * 0.92
+                    let maxH = (screen?.visibleFrame.height ?? 800) * 0.82
+                    w = min(maxW, 980)
+                    h = min(maxH, 640)
                 }
             } else if cfg.dynamicSizing {
                 let (dynW, dynH) = dynamicDimensions(for: viewModel.activeTab, isSettings: viewModel.isSettingsActive)
@@ -576,7 +582,7 @@ final class NotchPanelController: NSObject {
             return (540, 230)
         case .shelf:
             return (620, 260)
-        case .web, .whatsapp, .slack, .googlechat:
+        case .web, .whatsapp, .slack, .googlechat, .gpt, .claude:
             let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
             let maxW = (screen?.visibleFrame.width ?? 1200) * 0.92
             let maxH = (screen?.visibleFrame.height ?? 800) * 0.82

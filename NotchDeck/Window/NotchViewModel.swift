@@ -8,7 +8,7 @@ import SwiftUI
 
 /// Which tab is shown in the expanded notch.
 enum NotchTab: String, CaseIterable {
-    case home, notes, shelf, terminal, holder, vpn, web, whatsapp, slack, googlechat
+    case home, notes, shelf, terminal, holder, vpn, web, whatsapp, slack, googlechat, gpt, claude
 }
 
 @MainActor

@@ -120,6 +120,10 @@ struct ExpandedView: View {
                 items.append(TabItemModel(id: "googlechat", title: "Chat", iconName: "bubble.left.and.bubble.right.fill", builtInTab: .googlechat))
             case "whatsapp":
                 items.append(TabItemModel(id: "whatsapp", title: "WhatsApp", iconName: "message.fill", builtInTab: .whatsapp))
+            case "gpt", "chatgpt", "openai":
+                items.append(TabItemModel(id: "gpt", title: "ChatGPT", iconName: "sparkles", builtInTab: .gpt))
+            case "claude", "anthropic":
+                items.append(TabItemModel(id: "claude", title: "Claude", iconName: "brain.head.profile", builtInTab: .claude))
             case "slack", "slackterm", "slack-term":
                 items.append(TabItemModel(id: "slack", title: "Slack", iconName: "number", builtInTab: .slack))
             case "holder":
@@ -503,6 +507,26 @@ struct ExpandedView: View {
                     userAgent: WebTabItem.chromeUserAgent,
                     viewModel: viewModel
                 )
+            case .gpt:
+                DedicatedWebView(
+                    id: "gpt",
+                    title: "ChatGPT",
+                    icon: "sparkles",
+                    brandColor: Color(red: 0.06, green: 0.65, blue: 0.52),
+                    defaultURL: URL(string: "https://chatgpt.com")!,
+                    userAgent: WebTabItem.chromeUserAgent,
+                    viewModel: viewModel
+                )
+            case .claude:
+                DedicatedWebView(
+                    id: "claude",
+                    title: "Claude",
+                    icon: "brain.head.profile",
+                    brandColor: Color(red: 0.85, green: 0.44, blue: 0.28),
+                    defaultURL: URL(string: "https://claude.ai")!,
+                    userAgent: WebTabItem.chromeUserAgent,
+                    viewModel: viewModel
+                )
             case .slack:
                 SlackTermView(viewModel: viewModel)
             case .shelf:
@@ -825,6 +849,8 @@ extension NotchTab {
         case .holder:     "Holder"
         case .vpn:        "VPN"
         case .web:        "Web"
+        case .gpt:        "ChatGPT"
+        case .claude:     "Claude"
         }
     }
 
@@ -840,6 +866,8 @@ extension NotchTab {
         case .holder:     "macwindow.on.rectangle"
         case .vpn:        "lock.shield"
         case .web:        "globe"
+        case .gpt:        "sparkles"
+        case .claude:     "brain.head.profile"
         }
     }
 }
