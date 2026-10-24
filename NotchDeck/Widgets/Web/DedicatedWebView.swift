@@ -752,6 +752,7 @@ struct DedicatedWebView: View {
     let defaultURL: URL
     let userAgent: String
     var viewModel: NotchViewModel? = nil
+    var customHeaderLeading: AnyView? = nil
 
     @ObservedObject private var model: DedicatedWebModel
     @Environment(\.deckTheme) private var theme: DeckTheme
@@ -763,7 +764,8 @@ struct DedicatedWebView: View {
         brandColor: Color,
         defaultURL: URL,
         userAgent: String = WebTabItem.chromeUserAgent,
-        viewModel: NotchViewModel? = nil
+        viewModel: NotchViewModel? = nil,
+        customHeaderLeading: AnyView? = nil
     ) {
         self.id = id
         self.title = title
@@ -772,6 +774,7 @@ struct DedicatedWebView: View {
         self.defaultURL = defaultURL
         self.userAgent = userAgent
         self.viewModel = viewModel
+        self.customHeaderLeading = customHeaderLeading
         self.model = DedicatedWebModelRegistry.shared.model(id: id, defaultURL: defaultURL, userAgent: userAgent)
     }
 
@@ -779,23 +782,27 @@ struct DedicatedWebView: View {
         VStack(spacing: 0) {
             // Header Bar
             HStack(spacing: 8) {
-                // App Brand Badge & Host
-                HStack(spacing: 6) {
-                    Image(systemName: icon)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(brandColor)
+                if let customLeading = customHeaderLeading {
+                    customLeading
+                } else {
+                    // App Brand Badge & Host
+                    HStack(spacing: 6) {
+                        Image(systemName: icon)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(brandColor)
 
-                    Text(title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(theme.primaryText)
+                        Text(title)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(theme.primaryText)
 
-                    if let host = (model.webView?.url ?? defaultURL).host {
-                        Text(host)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(theme.tertiaryText)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(theme.inputBackground.opacity(0.6)))
+                        if let host = (model.webView?.url ?? defaultURL).host {
+                            Text(host)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(theme.tertiaryText)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(theme.inputBackground.opacity(0.6)))
+                        }
                     }
                 }
 

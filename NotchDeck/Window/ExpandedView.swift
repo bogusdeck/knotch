@@ -120,6 +120,8 @@ struct ExpandedView: View {
                 items.append(TabItemModel(id: "googlechat", title: "Chat", iconName: "bubble.left.and.bubble.right.fill", builtInTab: .googlechat))
             case "whatsapp":
                 items.append(TabItemModel(id: "whatsapp", title: "WhatsApp", iconName: "message.fill", builtInTab: .whatsapp))
+            case "ai", "artificial-intelligence", "llm", "assistant":
+                items.append(TabItemModel(id: "ai", title: "AI", iconName: "sparkles", builtInTab: .ai))
             case "gpt", "chatgpt", "openai":
                 items.append(TabItemModel(id: "gpt", title: "ChatGPT", iconName: "sparkles", builtInTab: .gpt))
             case "claude", "anthropic":
@@ -527,6 +529,8 @@ struct ExpandedView: View {
                     userAgent: WebTabItem.chromeUserAgent,
                     viewModel: viewModel
                 )
+            case .ai:
+                AITabView(viewModel: viewModel)
             case .slack:
                 SlackTermView(viewModel: viewModel)
             case .shelf:
@@ -851,6 +855,7 @@ extension NotchTab {
         case .web:        "Web"
         case .gpt:        "ChatGPT"
         case .claude:     "Claude"
+        case .ai:         "AI"
         }
     }
 
@@ -868,6 +873,7 @@ extension NotchTab {
         case .web:        "globe"
         case .gpt:        "sparkles"
         case .claude:     "brain.head.profile"
+        case .ai:         "sparkles"
         }
     }
 }

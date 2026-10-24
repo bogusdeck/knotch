@@ -47,7 +47,7 @@ Modifier tokens: `cmd`, `shift`, `opt`, `ctrl`. Key tokens: any single letter or
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tabs` | array of strings | `["home","notes","shelf","terminal","vpn"]` | Ordered list of tabs shown in the expanded notch. Built-in tabs: `home`, `notes`, `shelf`, `terminal`, `vpn`, `web`, `googlechat`, `whatsapp`, `slack`, `holder`, `gpt` (ChatGPT), `claude` (Claude). |
+| `tabs` | array of strings | `["home","notes","shelf","terminal","vpn"]` | Ordered list of tabs shown in the expanded notch. Built-in tabs: `home`, `notes`, `shelf`, `terminal`, `vpn`, `web`, `googlechat`, `whatsapp`, `slack`, `holder`, `ai` (Unified ChatGPT & Claude), `gpt`, `claude`. |
 | `home` | array of strings | `["media","clock","calendar","vpn-status"]` | Widget IDs shown on the Home tab. |
 
 ---
