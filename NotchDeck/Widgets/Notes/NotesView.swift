@@ -11,17 +11,18 @@ struct NotesView: View {
     @Environment(\.deckTheme) private var theme: DeckTheme
 
     @State private var quickText: String = ""
+    @State private var isTodoMode: Bool = false
     @FocusState private var isInputFocused: Bool
     @State private var hoveredNoteId: String? = nil
     @State private var copiedNoteId: String? = nil
 
     var body: some View {
-        VStack(spacing: 12) {
-            // Quick note entry bar
+        VStack(spacing: 10) {
+            // Quick note / todo entry bar
             quickInputSection
 
-            // Search bar
-            searchSection
+            // Search bar & Category filters
+            filterAndSearchSection
 
             // Notes list
             notesListSection
@@ -49,11 +50,33 @@ struct NotesView: View {
     private var quickInputSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Image(systemName: "square.and.pencil")
-                    .foregroundStyle(theme.accent)
-                    .imageScale(.medium)
+                // Mode Toggle Button (Note vs Todo)
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
+                        isTodoMode.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: isTodoMode ? "checkmark.square.fill" : "square.and.pencil")
+                            .foregroundStyle(isTodoMode ? theme.accent : theme.secondaryText)
+                            .imageScale(.medium)
 
-                TextField("Take a quick note...", text: $quickText, axis: .vertical)
+                        Text(isTodoMode ? "Todo" : "Note")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(isTodoMode ? theme.accent : theme.secondaryText)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(isTodoMode ? theme.accent.opacity(0.18) : theme.inputBackground.opacity(0.5))
+                    )
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+                .help(isTodoMode ? "Switch to Normal Note" : "Switch to Todo Checklist (or type [])")
+
+                TextField(isTodoMode ? "Add a todo item (or type [])..." : "Take a quick note (or type [] for todos)...", text: $quickText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .focused($isInputFocused)
                     .lineLimit(1...4)
@@ -71,6 +94,24 @@ struct NotesView: View {
                         return .handled
                     }
 
+                // Quick [] Insert Button
+                if !isTodoMode && !quickText.hasPrefix("[]") && !quickText.hasPrefix("- [ ]") {
+                    Button {
+                        quickText = "- [ ] " + quickText
+                        isTodoMode = true
+                    } label: {
+                        Text("[]")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundStyle(theme.secondaryText)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(RoundedRectangle(cornerRadius: 4).fill(theme.inputBackground))
+                    }
+                    .buttonStyle(.plain)
+                    .pointingHandCursor()
+                    .help("Insert Todo Checkbox")
+                }
+
                 if !quickText.isEmpty {
                     Button(action: saveQuickNote) {
                         Text("Save")
@@ -85,7 +126,7 @@ struct NotesView: View {
                     .pointingHandCursor()
                 }
             }
-            .padding(10)
+            .padding(9)
             .background(theme.cardBackground)
             .cornerRadius(10)
             .overlay(
@@ -94,7 +135,7 @@ struct NotesView: View {
             )
 
             HStack {
-                Text("⏎ to save • ⇧⏎ for newline • Esc to close")
+                Text("⏎ save • ⇧⏎ newline • type [] for todos • Esc close")
                     .font(.system(size: 9))
                     .foregroundStyle(theme.tertiaryText)
                 Spacer()
@@ -104,40 +145,95 @@ struct NotesView: View {
     }
 
     private func saveQuickNote() {
-        let trimmed = quickText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = quickText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+
+        if isTodoMode {
+            if !trimmed.contains("[ ]") && !trimmed.contains("[]") && !trimmed.contains("[x]") && !trimmed.contains("[X]") {
+                trimmed = "- [ ] " + trimmed
+            } else if trimmed.hasPrefix("[] ") {
+                trimmed = "- [ ] " + String(trimmed.dropFirst(3))
+            }
+        } else {
+            if trimmed.hasPrefix("[] ") {
+                trimmed = "- [ ] " + String(trimmed.dropFirst(3))
+            }
+        }
+
         notesManager.createNote(content: trimmed)
         quickText = ""
     }
 
-    // MARK: - Search Section
+    // MARK: - Search & Filter Section
 
-    private var searchSection: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .imageScale(.small)
-                .foregroundStyle(theme.tertiaryText)
+    private var filterAndSearchSection: some View {
+        HStack(spacing: 8) {
+            // Category Filter Pills
+            HStack(spacing: 4) {
+                ForEach(NoteFilterCategory.allCases) { cat in
+                    let count: Int = {
+                        switch cat {
+                        case .all: return notesManager.notes.count
+                        case .notes: return notesManager.notes.filter { !$0.hasTodos }.count
+                        case .todos: return notesManager.notes.filter { $0.hasTodos }.count
+                        }
+                    }()
+                    let isSelected = notesManager.filterCategory == cat
 
-            TextField("Search notes...", text: $notesManager.searchQuery)
-                .textFieldStyle(.plain)
-                .font(.system(size: 11))
-
-            if !notesManager.searchQuery.isEmpty {
-                Button {
-                    notesManager.searchQuery = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .imageScale(.small)
-                        .foregroundStyle(theme.tertiaryText)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            notesManager.filterCategory = cat
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: cat.icon)
+                                .font(.system(size: 9))
+                            Text("\(cat.rawValue) (\(count))")
+                                .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+                        }
+                        .foregroundStyle(isSelected ? Color.white : theme.secondaryText)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3.5)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? theme.accent.opacity(0.85) : theme.inputBackground.opacity(0.6))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .pointingHandCursor()
                 }
-                .buttonStyle(.plain)
-                .pointingHandCursor()
             }
+
+            Spacer()
+
+            // Search Bar
+            HStack(spacing: 5) {
+                Image(systemName: "magnifyingglass")
+                    .imageScale(.small)
+                    .foregroundStyle(theme.tertiaryText)
+
+                TextField("Search...", text: $notesManager.searchQuery)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+
+                if !notesManager.searchQuery.isEmpty {
+                    Button {
+                        notesManager.searchQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .imageScale(.small)
+                            .foregroundStyle(theme.tertiaryText)
+                    }
+                    .buttonStyle(.plain)
+                    .pointingHandCursor()
+                }
+            }
+            .frame(maxWidth: 160)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(theme.inputBackground)
+            .cornerRadius(6)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(theme.inputBackground)
-        .cornerRadius(6)
     }
 
     // MARK: - Notes List Section
@@ -172,13 +268,32 @@ struct NotesView: View {
             .pointingHandCursor()
             .padding(.top, 2)
 
-            // Content snippet
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
+            // Content snippet & interactive checklist
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .center, spacing: 6) {
+                    if note.hasTodos {
+                        Image(systemName: "checklist")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(theme.accent)
+                    }
+
                     Text(note.title)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(theme.primaryText)
                         .lineLimit(1)
+
+                    if note.hasTodos {
+                        let (done, total) = note.todoStats
+                        Text("\(done)/\(total)")
+                            .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                            .foregroundStyle(done == total && total > 0 ? Color.green : theme.accent)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(
+                                Capsule()
+                                    .fill(done == total && total > 0 ? Color.green.opacity(0.15) : theme.accent.opacity(0.15))
+                            )
+                    }
 
                     Spacer()
 
@@ -187,7 +302,40 @@ struct NotesView: View {
                         .foregroundStyle(theme.tertiaryText)
                 }
 
-                if !note.preview.isEmpty {
+                if note.hasTodos {
+                    // Render interactive checklist lines
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(note.parsedLines) { lineItem in
+                            if lineItem.isTodo {
+                                Button {
+                                    withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                                        notesManager.toggleTodo(note: note, lineIndex: lineItem.id)
+                                    }
+                                } label: {
+                                    HStack(alignment: .center, spacing: 6) {
+                                        Image(systemName: lineItem.isCompleted ? "checkmark.square.fill" : "square")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(lineItem.isCompleted ? theme.accent : theme.secondaryText)
+
+                                        Text(lineItem.text)
+                                            .font(.system(size: 11))
+                                            .strikethrough(lineItem.isCompleted, color: theme.tertiaryText)
+                                            .foregroundStyle(lineItem.isCompleted ? theme.tertiaryText : theme.primaryText)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .pointingHandCursor()
+                            } else if !lineItem.text.isEmpty && lineItem.text != note.title {
+                                Text(lineItem.text)
+                                    .font(.system(size: 10.5))
+                                    .foregroundStyle(theme.secondaryText)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .padding(.top, 2)
+                } else if !note.preview.isEmpty {
                     Text(note.preview)
                         .font(.system(size: 11))
                         .foregroundStyle(theme.secondaryText)

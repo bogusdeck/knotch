@@ -112,4 +112,47 @@ final class NotesManagerTests: XCTestCase {
         XCTAssertEqual(notesManager.notes.count, 0)
         XCTAssertFalse(FileManager.default.fileExists(atPath: note.fileURL.path))
     }
+
+    func testTodoParsingAndToggling() {
+        guard let note = notesManager.createNote(content: "# My List\n- [ ] Buy groceries\n- [x] Read book\n[] Walk dog") else {
+            XCTFail("Failed to create todo note")
+            return
+        }
+
+        XCTAssertTrue(note.hasTodos)
+        let stats = note.todoStats
+        XCTAssertEqual(stats.total, 3)
+        XCTAssertEqual(stats.completed, 1)
+
+        // Toggle line 1 (- [ ] Buy groceries -> - [x] Buy groceries)
+        notesManager.toggleTodo(note: note, lineIndex: 1)
+        let updated = notesManager.notes.first { $0.id == note.id }!
+        XCTAssertEqual(updated.todoStats.completed, 2)
+        XCTAssertTrue(updated.content.contains("- [x] Buy groceries"))
+
+        // Toggle line 2 (- [x] Read book -> - [ ] Read book)
+        notesManager.toggleTodo(note: updated, lineIndex: 2)
+        let updated2 = notesManager.notes.first { $0.id == note.id }!
+        XCTAssertEqual(updated2.todoStats.completed, 1)
+        XCTAssertTrue(updated2.content.contains("- [ ] Read book"))
+    }
+
+    func testCategoryFilteringNotesAndTodos() {
+        notesManager.createNote(content: "Pure plain note with text")
+        notesManager.createNote(content: "- [ ] A task to do")
+
+        // All category
+        notesManager.filterCategory = .all
+        XCTAssertEqual(notesManager.filteredNotes.count, 2)
+
+        // Notes only category
+        notesManager.filterCategory = .notes
+        XCTAssertEqual(notesManager.filteredNotes.count, 1)
+        XCTAssertFalse(notesManager.filteredNotes.first!.hasTodos)
+
+        // Todos only category
+        notesManager.filterCategory = .todos
+        XCTAssertEqual(notesManager.filteredNotes.count, 1)
+        XCTAssertTrue(notesManager.filteredNotes.first!.hasTodos)
+    }
 }

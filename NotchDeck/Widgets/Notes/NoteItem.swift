@@ -3,6 +3,14 @@
 
 import Foundation
 
+/// Represents a parsed line inside a note for rendering interactive todos or normal text.
+struct ParsedLineItem: Identifiable, Sendable, Equatable {
+    let id: Int
+    let isTodo: Bool
+    let isCompleted: Bool
+    let text: String
+}
+
 struct NoteItem: Identifiable, Sendable, Equatable {
     let id: String
     let filename: String
@@ -12,18 +20,62 @@ struct NoteItem: Identifiable, Sendable, Equatable {
     var createdAt: Date
     var modifiedAt: Date
 
-    /// Derived title: first non-empty line stripped of markdown headers, or "Untitled Note".
+    /// Derived title: first non-empty line stripped of markdown headers and todo prefixes, or "Untitled Note".
     var title: String {
         let lines = content.components(separatedBy: .newlines)
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty || trimmed.hasPrefix("---") { continue }
-            let headerCleaned = trimmed.replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
+            var headerCleaned = trimmed.replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
+            headerCleaned = headerCleaned.replacingOccurrences(of: "^[-*+]?\\s*\\[[ xX]?\\]\\s*", with: "", options: .regularExpression)
             if !headerCleaned.isEmpty {
                 return headerCleaned
             }
         }
         return "Untitled Note"
+    }
+
+    /// Whether this note contains any todo checkboxes ([ ], [x], [], etc.)
+    var hasTodos: Bool {
+        content.range(of: "(^|\\n)\\s*[-*+]?\\s*\\[[ xX]?\\]", options: .regularExpression) != nil
+    }
+
+    /// Count of completed and total todo items in the note
+    var todoStats: (completed: Int, total: Int) {
+        let lines = content.components(separatedBy: .newlines)
+        var total = 0
+        var completed = 0
+        for line in lines {
+            if line.range(of: "^\\s*[-*+]?\\s*\\[[xX]\\]", options: .regularExpression) != nil {
+                total += 1
+                completed += 1
+            } else if line.range(of: "^\\s*[-*+]?\\s*\\[[ ]?\\]", options: .regularExpression) != nil {
+                total += 1
+            }
+        }
+        return (completed, total)
+    }
+
+    /// Parsed lines for rendering in note cards
+    var parsedLines: [ParsedLineItem] {
+        let lines = content.components(separatedBy: .newlines)
+        var result: [ParsedLineItem] = []
+        for (idx, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("---") { continue }
+
+            if let match = line.range(of: "^\\s*[-*+]?\\s*\\[[xX]\\]\\s*", options: .regularExpression) {
+                let text = String(line[match.upperBound...])
+                result.append(ParsedLineItem(id: idx, isTodo: true, isCompleted: true, text: text))
+            } else if let match = line.range(of: "^\\s*[-*+]?\\s*\\[[ ]?\\]\\s*", options: .regularExpression) {
+                let text = String(line[match.upperBound...])
+                result.append(ParsedLineItem(id: idx, isTodo: true, isCompleted: false, text: text))
+            } else if !trimmed.isEmpty {
+                let headerCleaned = trimmed.replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
+                result.append(ParsedLineItem(id: idx, isTodo: false, isCompleted: false, text: headerCleaned))
+            }
+        }
+        return result
     }
 
     /// Derived preview: body text following the title.
@@ -43,6 +95,26 @@ struct NoteItem: Identifiable, Sendable, Equatable {
             if previewLines.count >= 2 { break }
         }
         return previewLines.joined(separator: " ")
+    }
+
+    /// Toggles the todo checkbox at the given line index.
+    func togglingTodo(at lineIndex: Int) -> NoteItem {
+        var lines = content.components(separatedBy: "\n")
+        guard lineIndex >= 0 && lineIndex < lines.count else { return self }
+        let line = lines[lineIndex]
+
+        if let range = line.range(of: "\\[[xX]\\]", options: .regularExpression) {
+            lines[lineIndex] = line.replacingCharacters(in: range, with: "[ ]")
+        } else if let range = line.range(of: "\\[ \\]", options: .regularExpression) {
+            lines[lineIndex] = line.replacingCharacters(in: range, with: "[x]")
+        } else if let range = line.range(of: "\\[\\]", options: .regularExpression) {
+            lines[lineIndex] = line.replacingCharacters(in: range, with: "[x]")
+        }
+
+        var updated = self
+        updated.content = lines.joined(separator: "\n")
+        updated.modifiedAt = Date()
+        return updated
     }
 
     // MARK: - Markdown Serialization

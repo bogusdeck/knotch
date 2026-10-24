@@ -8,6 +8,22 @@ import OSLog
 
 private let logger = Logger(subsystem: "com.notchdeck.app", category: "NotesManager")
 
+enum NoteFilterCategory: String, CaseIterable, Identifiable {
+    case all = "All"
+    case notes = "Notes"
+    case todos = "Todos"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .all: return "tray.full"
+        case .notes: return "note.text"
+        case .todos: return "checklist"
+        }
+    }
+}
+
 @MainActor
 final class NotesManager: ObservableObject {
 
@@ -15,6 +31,7 @@ final class NotesManager: ObservableObject {
 
     @Published private(set) var notes: [NoteItem] = []
     @Published var searchQuery: String = ""
+    @Published var filterCategory: NoteFilterCategory = .all
 
     // MARK: - Properties
 
@@ -154,14 +171,29 @@ final class NotesManager: ObservableObject {
         NSWorkspace.shared.open(note.fileURL)
     }
 
+    func toggleTodo(note: NoteItem, lineIndex: Int) {
+        let updated = note.togglingTodo(at: lineIndex)
+        saveNote(updated)
+    }
+
     // MARK: - Filtered Notes
 
     var filteredNotes: [NoteItem] {
         let query = searchQuery.trimmingCharacters(in: .whitespaces).lowercased()
         let matching = notes.filter { note in
-            if query.isEmpty { return true }
-            return note.title.lowercased().contains(query) ||
-                   note.content.lowercased().contains(query)
+            let matchesSearch = query.isEmpty ||
+                note.title.lowercased().contains(query) ||
+                note.content.lowercased().contains(query)
+            guard matchesSearch else { return false }
+
+            switch filterCategory {
+            case .all:
+                return true
+            case .notes:
+                return !note.hasTodos
+            case .todos:
+                return note.hasTodos
+            }
         }
 
         // Sort: pinned first, then newest createdAt
