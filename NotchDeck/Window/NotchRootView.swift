@@ -175,7 +175,10 @@ struct NotchRootView: View {
             )
             .opacity(viewModel.state == .expanded ? 1 : 0)
             .allowsHitTesting(viewModel.state == .expanded)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(
+                width: viewModel.state == .expanded ? nil : 0,
+                height: viewModel.state == .expanded ? nil : 0
+            )
             .clipped()
 
             if viewModel.state == .collapsed {
@@ -244,8 +247,8 @@ struct NotchRootView: View {
                         .transition(.opacity)
                 }
             }
-            .frame(width: notchW, height: notchH)
             .padding(.horizontal, 10)
+            .frame(width: notchW, height: notchH)
         }
         .frame(width: notchW, height: notchH)
         .contentShape(Rectangle())
