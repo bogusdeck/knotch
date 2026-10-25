@@ -48,9 +48,6 @@ targets:
       - path: Settings
       - path: UI
       - path: Resources
-        type: folder
-    resources:
-      - Resources
     settings:
       base:
         INFOPLIST_FILE: App/Info.plist

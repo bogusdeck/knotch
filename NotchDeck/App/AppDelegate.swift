@@ -43,7 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 4. Status-bar item as fallback icon / right-click menu
         setupStatusItem()
 
-        // 5. Never appear in the Dock or app switcher
+        // 5. Set application icon & accessory policy
+        if let iconImage = NSImage(named: "AppIcon") ?? Bundle.main.image(forResource: "AppIcon") {
+            NSApp.applicationIconImage = iconImage
+        }
         NSApp.setActivationPolicy(.accessory)
 
         // 6. Memory optimization: cap URLCache memory footprint to 20MB (default is 512MB)
