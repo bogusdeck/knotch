@@ -104,6 +104,45 @@ struct NotchShape: Shape {
     }
 }
 
+// MARK: - Notch Outline Shape (U-shaped border around hardware notch)
+
+/// Open U-shaped stroke tracing the perimeter of the MacBook notch:
+/// down the left edge, curving around the bottom corners and bottom edge, and up the right edge.
+struct NotchOutlineShape: Shape {
+    var cornerRadius: CGFloat = 13
+    var inset: CGFloat = 1.0
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let minX = rect.minX + inset
+        let maxX = rect.maxX - inset
+        let minY = rect.minY
+        let maxY = rect.maxY - inset
+        let r = max(0, min(cornerRadius, (maxY - minY)))
+
+        // Start at top-left touching the top screen bezel
+        path.move(to: CGPoint(x: minX, y: minY))
+        // Down the left edge
+        path.addLine(to: CGPoint(x: minX, y: maxY - r))
+        // Bottom-left rounded corner
+        path.addQuadCurve(
+            to: CGPoint(x: minX + r, y: maxY),
+            control: CGPoint(x: minX, y: maxY)
+        )
+        // Bottom horizontal edge
+        path.addLine(to: CGPoint(x: maxX - r, y: maxY))
+        // Bottom-right rounded corner
+        path.addQuadCurve(
+            to: CGPoint(x: maxX, y: maxY - r),
+            control: CGPoint(x: maxX, y: maxY)
+        )
+        // Up the right edge to top bezel
+        path.addLine(to: CGPoint(x: maxX, y: minY))
+
+        return path
+    }
+}
+
 // MARK: - State → animatable value mapping
 
 extension NotchState {

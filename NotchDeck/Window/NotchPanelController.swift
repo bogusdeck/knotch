@@ -484,9 +484,9 @@ final class NotchPanelController: NSObject {
         switch state {
         case .collapsed:
             if viewModel.hasWhatsAppNotification {
-                // Expand 10pt wider (5pt left & right) and 4pt taller (4pt bottom) so it peeks out around the physical notch
-                let w = geometry.notchFrame.width + 10
-                let h = geometry.notchFrame.height + 4
+                // Expand 4pt wider (2pt left & right) and 2pt taller (2pt bottom) so the 2pt green line hugs the hardware notch
+                let w = geometry.notchFrame.width + 4
+                let h = geometry.notchFrame.height + 2
                 return CGRect(
                     x: geometry.notchFrame.midX - w / 2,
                     y: geometry.notchFrame.maxY - h,

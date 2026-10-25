@@ -87,45 +87,58 @@ struct NotchRootView: View {
         let shadowColor = !isCollapsed ? Color.black.opacity(0.42) : Color.clear
         let notchW = viewModel.geometry.notchFrame.width
         let notchH = viewModel.geometry.notchFrame.height
-        let collapsedW = showWhatsAppGlow ? notchW + 10 : notchW
-        let collapsedH = showWhatsAppGlow ? notchH + 4 : notchH
+        let collapsedW = showWhatsAppGlow ? notchW + 4 : notchW
+        let collapsedH = showWhatsAppGlow ? notchH + 2 : notchH
 
         return ZStack(alignment: .top) {
+            // Base notch fill - ALWAYS pitch black when collapsed so it seamlessly merges with hardware notch
+            NotchShape(
+                hasNotch: viewModel.geometry.hasNotch,
+                state: viewModel.state,
+                cornerRadius: isCollapsedNotch ? 13 : cornerR
+            )
+            .fill(isCollapsedNotch ? Color.black : theme.background)
+            .frame(
+                width: isCollapsedNotch ? collapsedW : nil,
+                height: isCollapsedNotch ? collapsedH : nil
+            )
+
+            // When WhatsApp notification is present, draw a crisp green outline stroke hugging the hardware notch
             if showWhatsAppGlow {
-                // WhatsApp Notification: Pure Electric Green Pill (Zero black fill outside the notch)
-                NotchShape(
-                    hasNotch: viewModel.geometry.hasNotch,
-                    state: viewModel.state,
-                    cornerRadius: 15
-                )
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.15, green: 0.83, blue: 0.45),
-                            Color(red: 0.22, green: 0.98, blue: 0.52),
-                            Color(red: 0.15, green: 0.83, blue: 0.45)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: Color(red: 0.15, green: 0.83, blue: 0.45).opacity(0.95), radius: 6, x: 0, y: 2)
-                .shadow(color: Color(red: 0.22, green: 0.98, blue: 0.52).opacity(0.6), radius: 10, x: 0, y: 2)
-                .frame(
-                    width: isCollapsedNotch ? collapsedW : nil,
-                    height: isCollapsedNotch ? collapsedH : nil
-                )
-            } else {
-                NotchShape(
-                    hasNotch: viewModel.geometry.hasNotch,
-                    state: viewModel.state,
-                    cornerRadius: cornerR
-                )
-                .fill(isCollapsedNotch ? Color.black : theme.background)
-                .frame(
-                    width: isCollapsedNotch ? collapsedW : nil,
-                    height: isCollapsedNotch ? collapsedH : nil
-                )
+                if viewModel.geometry.hasNotch {
+                    NotchOutlineShape(cornerRadius: 13, inset: 1.0)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.15, green: 0.85, blue: 0.45),
+                                    Color(red: 0.25, green: 0.98, blue: 0.55),
+                                    Color(red: 0.15, green: 0.85, blue: 0.45)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                        )
+                        .shadow(color: Color(red: 0.15, green: 0.85, blue: 0.45).opacity(0.85), radius: 2.5, x: 0, y: 1)
+                        .frame(width: collapsedW, height: collapsedH)
+                } else {
+                    RoundedRectangle(cornerRadius: 13)
+                        .inset(by: 1.0)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.15, green: 0.85, blue: 0.45),
+                                    Color(red: 0.25, green: 0.98, blue: 0.55),
+                                    Color(red: 0.15, green: 0.85, blue: 0.45)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                        )
+                        .shadow(color: Color(red: 0.15, green: 0.85, blue: 0.45).opacity(0.85), radius: 2.5, x: 0, y: 1)
+                        .frame(width: collapsedW, height: collapsedH)
+                }
             }
 
             if showBorder {
@@ -184,8 +197,8 @@ struct NotchRootView: View {
     }
 
     private var collapsedView: some View {
-        let notchW = viewModel.hasWhatsAppNotification ? viewModel.geometry.notchFrame.width + 10 : viewModel.geometry.notchFrame.width
-        let notchH = viewModel.hasWhatsAppNotification ? viewModel.geometry.notchFrame.height + 4 : viewModel.geometry.notchFrame.height
+        let notchW = viewModel.hasWhatsAppNotification ? viewModel.geometry.notchFrame.width + 4 : viewModel.geometry.notchFrame.width
+        let notchH = viewModel.hasWhatsAppNotification ? viewModel.geometry.notchFrame.height + 2 : viewModel.geometry.notchFrame.height
 
         return ZStack {
             // Solid hit target restricted strictly to the notch frame
@@ -210,7 +223,7 @@ struct NotchRootView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "message.fill")
                             .font(.system(size: 8.5, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color(red: 0.22, green: 0.98, blue: 0.52))
                         if viewModel.whatsAppUnreadCount > 0 {
                             Text("\(viewModel.whatsAppUnreadCount)")
                                 .font(.system(size: 8, weight: .bold, design: .rounded))
@@ -219,7 +232,8 @@ struct NotchRootView: View {
                     }
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1.5)
-                    .background(Capsule().fill(Color.black.opacity(0.3)))
+                    .background(Capsule().fill(Color(red: 0.15, green: 0.83, blue: 0.45).opacity(0.25)))
+                    .overlay(Capsule().stroke(Color(red: 0.15, green: 0.83, blue: 0.45).opacity(0.4), lineWidth: 0.5))
                     .transition(.scale.combined(with: .opacity))
                 }
 
