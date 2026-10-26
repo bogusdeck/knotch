@@ -91,11 +91,8 @@ struct ExpandedView: View {
             if let customWork = layout.workTabs, !customWork.isEmpty {
                 configured = customWork
             } else {
-                // In Work mode: Google Chat and other work tools are visible; personal messaging (WhatsApp) is hidden
-                configured = layout.tabs.filter { id in
-                    let lower = id.lowercased()
-                    return lower != "whatsapp"
-                }
+                // In Work mode: Google Chat, WhatsApp, and all other configured tabs are visible
+                configured = layout.tabs
             }
         } else {
             if let customPersonal = layout.personalTabs, !customPersonal.isEmpty {
@@ -330,7 +327,7 @@ struct ExpandedView: View {
         }
         .buttonStyle(.plain)
         .pointingHandCursor()
-        .help(viewModel.isWorkMode ? "Work Mode Active (Google Chat enabled) — Click for Personal Mode" : "Personal Mode Active (WhatsApp enabled) — Click for Work Mode")
+        .help(viewModel.isWorkMode ? "Work Mode Active (Google Chat & WhatsApp enabled) — Click for Personal Mode" : "Personal Mode Active (WhatsApp enabled) — Click for Work Mode")
     }
 
     private var quitAppButton: some View {

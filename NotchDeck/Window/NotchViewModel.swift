@@ -89,9 +89,7 @@ final class NotchViewModel: ObservableObject {
         UserDefaults.standard.set(isWorkMode, forKey: "NotchDeckWorkMode")
 
         // Smoothly auto-switch active tab if the current one is hidden in the new mode
-        if isWorkMode && activeTab == .whatsapp {
-            activeTab = availableTabs.contains(.googlechat) ? .googlechat : (availableTabs.first ?? .home)
-        } else if !isWorkMode && activeTab == .googlechat {
+        if !isWorkMode && activeTab == .googlechat {
             activeTab = availableTabs.contains(.whatsapp) ? .whatsapp : (availableTabs.first ?? .home)
         } else if !availableTabs.isEmpty && !availableTabs.contains(activeTab) {
             activeTab = availableTabs.first ?? .home
