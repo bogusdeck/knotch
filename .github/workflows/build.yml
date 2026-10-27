@@ -37,15 +37,15 @@ jobs:
         run: |
           xcodebuild \
             -resolvePackageDependencies \
-            -project NotchDeck.xcodeproj \
-            -scheme NotchDeck
+            -project Knotch.xcodeproj \
+            -scheme Knotch
 
       - name: Build
         working-directory: NotchDeck
         run: |
           xcodebuild \
-            -project NotchDeck.xcodeproj \
-            -scheme NotchDeck \
+            -project Knotch.xcodeproj \
+            -scheme Knotch \
             -configuration Debug \
             -destination "platform=macOS,arch=arm64" \
             -skipPackagePluginValidation \
@@ -58,8 +58,8 @@ jobs:
         working-directory: NotchDeck
         run: |
           xcodebuild \
-            -project NotchDeck.xcodeproj \
-            -scheme NotchDeckTests \
+            -project Knotch.xcodeproj \
+            -scheme Knotch \
             -configuration Debug \
             -destination "platform=macOS,arch=arm64" \
             -skipPackagePluginValidation \

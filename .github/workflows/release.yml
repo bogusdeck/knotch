@@ -41,15 +41,15 @@ jobs:
         run: |
           xcodebuild \
             -resolvePackageDependencies \
-            -project NotchDeck.xcodeproj \
-            -scheme NotchDeck
+            -project Knotch.xcodeproj \
+            -scheme Knotch
 
       - name: Run Unit Tests
         working-directory: NotchDeck
         run: |
           xcodebuild \
-            -project NotchDeck.xcodeproj \
-            -scheme NotchDeckTests \
+            -project Knotch.xcodeproj \
+            -scheme Knotch \
             -configuration Debug \
             -destination "platform=macOS,arch=arm64" \
             -skipPackagePluginValidation \
@@ -89,19 +89,19 @@ jobs:
         run: |
           if [ "${{ steps.keychain.outputs.signed }}" = "true" ]; then
             xcodebuild archive \
-              -project NotchDeck.xcodeproj \
-              -scheme NotchDeck \
+              -project Knotch.xcodeproj \
+              -scheme Knotch \
               -configuration Release \
-              -archivePath "$RUNNER_TEMP/NotchDeck.xcarchive" \
+              -archivePath "$RUNNER_TEMP/Knotch.xcarchive" \
               -skipPackagePluginValidation \
               CODE_SIGN_STYLE="Manual" \
               CODE_SIGN_IDENTITY="Developer ID Application: ${{ secrets.DEVELOPER_ID_NAME }}"
           else
             xcodebuild archive \
-              -project NotchDeck.xcodeproj \
-              -scheme NotchDeck \
+              -project Knotch.xcodeproj \
+              -scheme Knotch \
               -configuration Release \
-              -archivePath "$RUNNER_TEMP/NotchDeck.xcarchive" \
+              -archivePath "$RUNNER_TEMP/Knotch.xcarchive" \
               -skipPackagePluginValidation \
               CODE_SIGN_IDENTITY="" \
               CODE_SIGNING_REQUIRED=NO
@@ -110,7 +110,7 @@ jobs:
       - name: Export Application
         run: |
           mkdir -p "$RUNNER_TEMP/export"
-          cp -R "$RUNNER_TEMP/NotchDeck.xcarchive/Products/Applications/NotchDeck.app" "$RUNNER_TEMP/export/"
+          cp -R "$RUNNER_TEMP/Knotch.xcarchive/Products/Applications/Knotch.app" "$RUNNER_TEMP/export/"
 
       - name: Notarize App (if Apple credentials provided)
         if: steps.keychain.outputs.signed == 'true' && env.APPLE_ID != ''
@@ -119,30 +119,31 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          ditto -c -k --keepParent "$RUNNER_TEMP/export/NotchDeck.app" "$RUNNER_TEMP/export/NotchDeck.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/export/NotchDeck.zip" \
+          ditto -c -k --keepParent "$RUNNER_TEMP/export/Knotch.app" "$RUNNER_TEMP/export/Knotch.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/export/Knotch.zip" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$TEAM_ID" \
             --wait
-          xcrun stapler staple "$RUNNER_TEMP/export/NotchDeck.app"
+          xcrun stapler staple "$RUNNER_TEMP/export/Knotch.app"
 
-      - name: Create DMG
+      - name: Package Artifacts (DMG & ZIP)
         run: |
           mkdir -p release-artifacts
+          ditto -c -k --keepParent "$RUNNER_TEMP/export/Knotch.app" "release-artifacts/Knotch.zip"
           create-dmg \
-            --volname "NotchDeck" \
+            --volname "Knotch" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --icon "NotchDeck.app" 175 120 \
+            --icon "Knotch.app" 175 120 \
             --app-drop-link 425 120 \
-            --hide-extension "NotchDeck.app" \
+            --hide-extension "Knotch.app" \
             --no-internet-enable \
-            "release-artifacts/NotchDeck.dmg" \
-            "$RUNNER_TEMP/export/NotchDeck.app" || {
+            "release-artifacts/Knotch.dmg" \
+            "$RUNNER_TEMP/export/Knotch.app" || {
               # Fallback to hdiutil if create-dmg encounters display/finder issues on headless runner
-              hdiutil create -volname "NotchDeck" -srcfolder "$RUNNER_TEMP/export" -ov -format UDZO "release-artifacts/NotchDeck.dmg"
+              hdiutil create -volname "Knotch" -srcfolder "$RUNNER_TEMP/export" -ov -format UDZO "release-artifacts/Knotch.dmg"
             }
 
       - name: Notarize DMG (if signed)
@@ -152,24 +153,26 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          xcrun notarytool submit "release-artifacts/NotchDeck.dmg" \
+          xcrun notarytool submit "release-artifacts/Knotch.dmg" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$TEAM_ID" \
             --wait
-          xcrun stapler staple "release-artifacts/NotchDeck.dmg"
+          xcrun stapler staple "release-artifacts/Knotch.dmg"
 
-      - name: Upload DMG Artifact
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: NotchDeck-DMG
-          path: release-artifacts/NotchDeck.dmg
+          name: Knotch-Release
+          path: release-artifacts/*
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: release-artifacts/NotchDeck.dmg
+          files: |
+            release-artifacts/Knotch.dmg
+            release-artifacts/Knotch.zip
           generate_release_notes: true
           draft: false
           prerelease: false
