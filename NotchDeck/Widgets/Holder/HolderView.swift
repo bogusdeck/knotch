@@ -636,7 +636,7 @@ struct HolderView: View {
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(theme.primaryText)
 
-                    Text("Release mouse to pin application to your NotchDeck Holder")
+                    Text("Release mouse to pin application to your Knotch Holder")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(theme.secondaryText)
                 }

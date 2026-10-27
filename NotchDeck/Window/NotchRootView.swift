@@ -276,7 +276,7 @@ struct NotchRootView: View {
                 viewModel.requestExpand()
             }
             Divider()
-            Button("Quit NotchDeck") {
+            Button("Quit Knotch") {
                 NSApp.terminate(nil)
             }
         }

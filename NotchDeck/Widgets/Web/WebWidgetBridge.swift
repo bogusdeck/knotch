@@ -161,7 +161,7 @@ final class WebWidgetBridge: NSObject, WKScriptMessageHandlerWithReply {
         case "notify":
             let text = (body["text"] as? String) ?? ""
             let content = UNMutableNotificationContent()
-            content.title = self.widgetTitle.isEmpty ? "NotchDeck" : self.widgetTitle
+            content.title = self.widgetTitle.isEmpty ? "Knotch" : self.widgetTitle
             content.body = text
             content.sound = .default
 

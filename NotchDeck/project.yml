@@ -1,4 +1,4 @@
-name: NotchDeck
+name: Knotch
 options:
   bundleIdPrefix: com.notchdeck
   deploymentTarget:
@@ -52,7 +52,8 @@ targets:
       base:
         INFOPLIST_FILE: App/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.notchdeck.app
-        PRODUCT_NAME: NotchDeck
+        PRODUCT_NAME: Knotch
+        PRODUCT_MODULE_NAME: NotchDeck
     dependencies:
       - package: KeyboardShortcuts
       - package: TOMLKit
@@ -77,7 +78,20 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.notchdeck.tests
         PRODUCT_NAME: NotchDeckTests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Knotch.app/Contents/MacOS/Knotch
+        BUNDLE_LOADER: $(TEST_HOST)
     dependencies:
       - target: NotchDeck
       - package: TOMLKit
       - package: KeyboardShortcuts
+
+schemes:
+  Knotch:
+    build:
+      targets:
+        NotchDeck: all
+    test:
+      targets:
+        - NotchDeckTests
+    run:
+      config: Debug

@@ -56,7 +56,7 @@ final class TerminalManager: ObservableObject {
 
     private func notifyExit(for session: TerminalSession, exitCode: Int32) {
         let content = UNMutableNotificationContent()
-        content.title = "NotchDeck Terminal"
+        content.title = "Knotch Terminal"
         content.body = "Process '\(session.title)' exited with code \(exitCode)"
         content.sound = .default
 

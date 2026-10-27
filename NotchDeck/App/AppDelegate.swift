@@ -120,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let button = item.button {
                     button.image = NSImage(
                         systemSymbolName: "rectangle.topthird.inset.filled",
-                        accessibilityDescription: "NotchDeck"
+                        accessibilityDescription: "Knotch"
                     )
                     button.action = #selector(statusItemClicked)
                     button.target = self
@@ -142,12 +142,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildStatusMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Toggle NotchDeck", action: #selector(statusItemClicked), keyEquivalent: "")
+        menu.addItem(withTitle: "Toggle Knotch", action: #selector(statusItemClicked), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit NotchDeck", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit Knotch", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         return menu
     }
 
@@ -165,7 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settingsView = SettingsView(configManager: configManager)
         let hostingController = NSHostingController(rootView: settingsView)
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "NotchDeck Settings"
+        window.title = "Knotch Settings"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.setContentSize(NSSize(width: 600, height: 460))
         window.center()

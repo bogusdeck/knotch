@@ -175,9 +175,9 @@ struct NotchSettingsContentView: View {
 
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("NotchDeck v0.1.0")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.9))
+                            Text("Knotch v0.1.0")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
                             Text("Automatic updates powered by Sparkle")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.white.opacity(0.5))
@@ -360,7 +360,7 @@ struct NotchSettingsContentView: View {
                             Text("Toggle Notch")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.9))
-                            Text("Global shortcut to expand or collapse NotchDeck")
+                            Text("Global shortcut to expand or collapse Knotch")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.white.opacity(0.5))
                         }

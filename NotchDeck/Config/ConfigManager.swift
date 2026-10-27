@@ -23,9 +23,16 @@ final class ConfigManager: ObservableObject {
     // MARK: - Paths
 
     static let configDirectory: URL = {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config")
-            .appendingPathComponent("notchdeck")
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let knotchDir = home.appendingPathComponent(".config").appendingPathComponent("knotch")
+        let notchdeckDir = home.appendingPathComponent(".config").appendingPathComponent("notchdeck")
+        if FileManager.default.fileExists(atPath: knotchDir.path) {
+            return knotchDir
+        }
+        if FileManager.default.fileExists(atPath: notchdeckDir.path) {
+            return notchdeckDir
+        }
+        return knotchDir
     }()
 
     static let configFile: URL = configDirectory
@@ -158,8 +165,8 @@ enum ConfigError: LocalizedError, Sendable {
 // MARK: - Default config content
 
 let defaultConfigTOML = """
-# NotchDeck Configuration
-# Full reference: ~/.config/notchdeck/README → docs/CONFIG.md
+# Knotch Configuration
+# Full reference: ~/.config/knotch/README → docs/CONFIG.md
 
 [general]
 screen = "builtin"

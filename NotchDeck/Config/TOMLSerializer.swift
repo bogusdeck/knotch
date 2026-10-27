@@ -8,8 +8,8 @@ enum TOMLSerializer {
     static func serialize(_ config: AppConfig) -> String {
         var lines: [String] = []
 
-        lines.append("# NotchDeck Configuration")
-        lines.append("# Sourced from ~/.config/notchdeck/config.toml")
+        lines.append("# Knotch Configuration")
+        lines.append("# Sourced from ~/.config/knotch/config.toml")
         lines.append("")
 
         // [general]

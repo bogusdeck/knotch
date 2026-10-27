@@ -15,7 +15,9 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
+    <string>Knotch</string>
+    <key>CFBundleDisplayName</key>
+    <string>Knotch</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -27,7 +29,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright © 2024 NotchDeck Contributors. MIT License.</string>
+    <string>Copyright © 2024 Knotch Contributors. MIT License.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSSupportsAutomaticTermination</key>
@@ -35,23 +37,23 @@
     <key>NSSupportsSuddenTermination</key>
     <false/>
     <key>SUFeedURL</key>
-    <string>https://example.com/notchdeck/appcast.xml</string>
+    <string>https://example.com/knotch/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string></string>
     <key>NSCalendarsUsageDescription</key>
-    <string>NotchDeck displays upcoming calendar events in the notch hub.</string>
+    <string>Knotch displays upcoming calendar events in the notch hub.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>NotchDeck displays upcoming calendar events in the notch hub.</string>
+    <string>Knotch displays upcoming calendar events in the notch hub.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>NotchDeck controls media playback for Spotify and Music in the notch.</string>
+    <string>Knotch controls media playback for Spotify and Music in the notch.</string>
     <key>NSCameraUsageDescription</key>
-    <string>NotchDeck requires camera access for video conferencing and calls in web apps like WhatsApp and Slack.</string>
+    <string>Knotch requires camera access for video conferencing and calls in web apps like WhatsApp and Slack.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>NotchDeck requires microphone access for voice messages and calls in web apps like WhatsApp and Slack.</string>
+    <string>Knotch requires microphone access for voice messages and calls in web apps like WhatsApp and Slack.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>NotchDeck uses your location for location-based web services.</string>
+    <string>Knotch uses your location for location-based web services.</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
-    <string>NotchDeck connects with external FIDO2 / Passkey security authenticators via Bluetooth.</string>
+    <string>Knotch connects with external FIDO2 / Passkey security authenticators via Bluetooth.</string>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>
