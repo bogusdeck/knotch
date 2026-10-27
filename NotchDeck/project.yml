@@ -54,6 +54,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.notchdeck.app
         PRODUCT_NAME: Knotch
         PRODUCT_MODULE_NAME: NotchDeck
+        CODE_SIGN_ENTITLEMENTS: App/NotchDeck.entitlements
     dependencies:
       - package: KeyboardShortcuts
       - package: TOMLKit
@@ -65,6 +66,15 @@ targets:
         script: |
           if which swiftlint > /dev/null; then
             swiftlint --quiet
+          fi
+        basedOnDependencyAnalysis: false
+    postBuildScripts:
+      - name: Copy CLI Tool
+        script: |
+          mkdir -p "${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/Contents/Resources/bin"
+          if [ -f "${SRCROOT}/../bin/knotch" ]; then
+            cp "${SRCROOT}/../bin/knotch" "${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/Contents/Resources/bin/knotch"
+            chmod +x "${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/Contents/Resources/bin/knotch"
           fi
         basedOnDependencyAnalysis: false
 

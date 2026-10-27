@@ -83,6 +83,64 @@ Everything is powered by a human-friendly `~/.config/knotch/config.toml` file wi
 
 ---
 
+## 💻 Command Line Interface (CLI)
+
+Knotch comes with a command-line interface (`knotch`) to control, manage, and inspect the application directly from your terminal or shell scripts.
+
+### Quick Start
+
+```bash
+# Start Knotch in the background
+knotch start
+
+# Check running status, PID, memory, uptime, and active mode
+knotch status
+
+# Toggle the notch canvas open / closed
+knotch
+
+# Switch to a specific tab
+knotch tab terminal
+knotch tab notes
+knotch tab whatsapp
+
+# Toggle or switch between Work and Personal mode
+knotch mode work
+knotch mode personal
+
+# Manage configuration
+knotch config edit
+knotch config reload
+knotch config test
+
+# Stop / quit Knotch gracefully
+knotch stop
+```
+
+### All CLI Commands
+
+| Command | Description |
+| :--- | :--- |
+| `knotch` | Toggle notch canvas (or starts Knotch if stopped) |
+| `knotch start` | Launch Knotch background application |
+| `knotch stop` / `quit` | Gracefully quit and terminate Knotch |
+| `knotch restart` | Restart Knotch application |
+| `knotch status` | Display status (PID, memory, CPU, uptime, active mode, config) |
+| `knotch toggle` | Toggle notch expanded / collapsed |
+| `knotch expand` / `open` | Expand the notch canvas |
+| `knotch collapse` / `close` | Collapse notch back into the MacBook bezel |
+| `knotch tab <name>` | Switch active tab (`home`, `terminal`, `notes`, `holder`, `whatsapp`, `ai`, `vpn`) |
+| `knotch notes` | Expand notch and immediately focus Quick Notes |
+| `knotch mode [work\|personal\|toggle]` | Switch or toggle between Work and Personal modes |
+| `knotch settings` | Open Knotch Preferences & Settings |
+| `knotch config [edit\|reload\|path\|cat\|test]` | Manage and test `~/.config/knotch/config.toml` |
+| `knotch logs` | Stream live application logs from unified logging |
+| `knotch install` | Symlink `knotch` CLI into your `$PATH` (`/opt/homebrew/bin` or `~/.local/bin`) |
+| `knotch version` | Print Knotch version |
+| `knotch help` | Display full CLI help reference |
+
+---
+
 ## 🚀 Installation
 
 ### Option 1: Homebrew (Recommended)

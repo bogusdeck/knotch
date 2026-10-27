@@ -64,6 +64,23 @@ Everything is driven by a single, clean `~/.config/notchdeck/config.toml` that h
 
 ---
 
+## 💻 CLI Commands (`knotch`)
+
+Control Knotch directly from terminal:
+
+```bash
+knotch start             # Launch Knotch in background
+knotch status            # Check PID, memory, uptime, and active mode
+knotch                   # Toggle notch open / collapsed
+knotch tab terminal      # Jump straight to terminal
+knotch mode work         # Switch to Work mode
+knotch mode personal     # Switch to Personal mode
+knotch config edit       # Edit configuration
+knotch stop              # Gracefully quit Knotch
+```
+
+---
+
 ## 🚀 Installation & Setup
 
 ### Prerequisites

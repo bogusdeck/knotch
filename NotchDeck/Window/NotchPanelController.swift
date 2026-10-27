@@ -443,6 +443,16 @@ final class NotchPanelController: NSObject {
         }
     }
 
+    func setWorkMode(_ enabled: Bool) {
+        if viewModel.isWorkMode != enabled {
+            viewModel.toggleWorkMode()
+        }
+    }
+
+    func toggleWorkMode() {
+        viewModel.toggleWorkMode()
+    }
+
     // MARK: - Panel resizing
 
     private func resizePanel(for state: NotchState, animated: Bool) {

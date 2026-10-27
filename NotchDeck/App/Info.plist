@@ -58,6 +58,15 @@
     <array>
         <dict>
             <key>CFBundleURLName</key>
+            <string>com.notchdeck.url-scheme</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>knotch</string>
+                <string>notchdeck</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleURLName</key>
             <string>com.notchdeck.googlechat-auth</string>
             <key>CFBundleURLSchemes</key>
             <array>

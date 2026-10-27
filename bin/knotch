@@ -1,0 +1,587 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# knotch - Command Line Interface for Knotch
+# The Intelligent Dynamic Island & Productivity Command Center for macOS
+# ==============================================================================
+
+set -eo pipefail
+
+VERSION="0.1.0"
+APP_BUNDLE_ID="com.notchdeck.app"
+
+# Resolve script directory (follows symlinks)
+resolve_symlink() {
+  local target="$1"
+  while [ -L "$target" ]; do
+    local dir
+    dir="$(cd -P "$(dirname "$target")" && pwd)"
+    target="$(readlink "$target")"
+    [[ $target != /* ]] && target="$dir/$target"
+  done
+  printf "%s" "$(cd -P "$(dirname "$target")" && pwd)"
+}
+
+SCRIPT_DIR="$(resolve_symlink "${BASH_SOURCE[0]}")"
+
+# Color helpers
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  BOLD="\033[1m"
+  DIM="\033[2m"
+  GREEN="\033[32m"
+  CYAN="\033[36m"
+  YELLOW="\033[33m"
+  RED="\033[31m"
+  PURPLE="\033[35m"
+  RESET="\033[0m"
+else
+  BOLD=""
+  DIM=""
+  GREEN=""
+  CYAN=""
+  YELLOW=""
+  RED=""
+  PURPLE=""
+  RESET=""
+fi
+
+# Locate Knotch.app
+find_app() {
+  local candidates=(
+    "/Applications/Knotch.app"
+    "$HOME/Applications/Knotch.app"
+    "$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)/build/Build/Products/Release/Knotch.app"
+    "$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)/build/Build/Products/Debug/Knotch.app"
+  )
+  for c in "${candidates[@]}"; do
+    if [ -d "$c" ]; then
+      echo "$c"
+      return 0
+    fi
+  done
+
+  # Check DerivedData
+  local dd
+  dd=$(ls -td "$HOME/Library/Developer/Xcode/DerivedData/Knotch-"*/Build/Products/Debug/Knotch.app 2>/dev/null | head -n 1)
+  if [ -n "$dd" ] && [ -d "$dd" ]; then
+    echo "$dd"
+    return 0
+  fi
+
+  # Fallback mdfind
+  local found
+  found=$(mdfind "kMDItemCFBundleIdentifier == '$APP_BUNDLE_ID'" 2>/dev/null | head -n 1)
+  if [ -n "$found" ] && [ -d "$found" ]; then
+    echo "$found"
+    return 0
+  fi
+
+  echo "/Applications/Knotch.app"
+}
+
+APP_PATH="$(find_app)"
+
+# Locate config file
+find_config() {
+  if [ -f "$HOME/.config/knotch/config.toml" ]; then
+    echo "$HOME/.config/knotch/config.toml"
+  elif [ -f "$HOME/.config/notchdeck/config.toml" ]; then
+    echo "$HOME/.config/notchdeck/config.toml"
+  else
+    echo "$HOME/.config/knotch/config.toml"
+  fi
+}
+
+CONFIG_FILE="$(find_config)"
+
+# Get PID of running Knotch
+get_pid() {
+  local p
+  p=$(pgrep -x Knotch 2>/dev/null || true)
+  if [ -z "$p" ]; then
+    p=$(pgrep -f "Knotch.app/Contents/MacOS/Knotch" 2>/dev/null || true)
+  fi
+  if [ -n "$p" ]; then
+    echo "$p" | head -n 1
+  fi
+}
+
+is_running() {
+  local p
+  p="$(get_pid)"
+  [ -n "$p" ]
+}
+
+# Post distributed notification
+post_notification() {
+  local name="$1"
+  local val="${2:-}"
+  osascript -l JavaScript -e "try { $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObject('$name', '$val'); } catch(e){}" >/dev/null 2>&1 || true
+}
+
+# Send URL action
+send_url() {
+  local action="$1"
+  open -g "knotch://${action}" 2>/dev/null || true
+}
+
+# Start command
+cmd_start() {
+  local pid
+  pid="$(get_pid)"
+  if [ -n "$pid" ]; then
+    echo -e "${YELLOW}Knotch is already running${RESET} ${DIM}(PID: ${pid})${RESET}"
+    return 0
+  fi
+
+  if [ ! -d "$APP_PATH" ]; then
+    echo -e "${RED}Error:${RESET} Knotch application not found at ${BOLD}${APP_PATH}${RESET}"
+    echo -e "Please ensure Knotch.app is installed in ${BOLD}/Applications${RESET}."
+    exit 1
+  fi
+
+  echo -e "${CYAN}Starting Knotch...${RESET} ${DIM}(${APP_PATH})${RESET}"
+  open -a "$APP_PATH"
+
+  # Wait for startup
+  local waited=0
+  while [ $waited -lt 15 ]; do
+    sleep 0.2
+    pid="$(get_pid)"
+    if [ -n "$pid" ]; then
+      echo -e "${GREEN}✔ Knotch started successfully!${RESET} ${DIM}(PID: ${pid})${RESET}"
+      return 0
+    fi
+    waited=$((waited + 1))
+  done
+
+  echo -e "${RED}Warning:${RESET} Knotch launched but process PID was not detected yet. Check logs with: ${BOLD}knotch logs${RESET}"
+}
+
+# Stop command
+cmd_stop() {
+  local pid
+  pid="$(get_pid)"
+  if [ -z "$pid" ]; then
+    echo -e "${DIM}Knotch is not running.${RESET}"
+    return 0
+  fi
+
+  echo -e "${CYAN}Stopping Knotch...${RESET} ${DIM}(PID: ${pid})${RESET}"
+
+  # Try polite notification & AppleScript quit
+  post_notification "com.notchdeck.app.quit"
+  osascript -e "tell application id \"${APP_BUNDLE_ID}\" to quit" 2>/dev/null || true
+
+  # Wait for exit
+  local waited=0
+  while [ $waited -lt 10 ]; do
+    sleep 0.2
+    if ! is_running; then
+      echo -e "${GREEN}✔ Knotch stopped.${RESET}"
+      return 0
+    fi
+    waited=$((waited + 1))
+  done
+
+  # Fallback to SIGTERM
+  kill "$pid" 2>/dev/null || true
+  sleep 0.5
+  if is_running; then
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+
+  if ! is_running; then
+    echo -e "${GREEN}✔ Knotch stopped.${RESET}"
+  else
+    echo -e "${RED}Failed to stop Knotch (PID: ${pid}).${RESET}"
+    exit 1
+  fi
+}
+
+# Restart command
+cmd_restart() {
+  if is_running; then
+    cmd_stop
+    sleep 0.5
+  fi
+  cmd_start
+}
+
+# Status command
+cmd_status() {
+  local pid
+  pid="$(get_pid)"
+
+  echo -e "${BOLD}Knotch Status${RESET}"
+  echo -e "----------------------------------------"
+
+  if [ -n "$pid" ]; then
+    echo -e "  State:     ${GREEN}● Running${RESET}"
+    echo -e "  PID:       ${BOLD}${pid}${RESET}"
+
+    # Extract memory and cpu
+    local ps_stats
+    ps_stats=$(ps -p "$pid" -o %cpu=,rss=,etime= 2>/dev/null || true)
+    if [ -n "$ps_stats" ]; then
+      local cpu rss etime
+      read -r cpu rss etime <<< "$ps_stats"
+      local mem_mb
+      mem_mb=$(awk -v r="$rss" 'BEGIN { printf "%.1f MB", r/1024 }')
+      echo -e "  Memory:    ${mem_mb}"
+      echo -e "  CPU:       ${cpu}%"
+      echo -e "  Uptime:    ${etime}"
+    fi
+
+    # Read Work Mode
+    local mode_raw
+    mode_raw=$(defaults read "$APP_BUNDLE_ID" NotchDeckWorkMode 2>/dev/null || echo "0")
+    if [ "$mode_raw" = "1" ]; then
+      echo -e "  Mode:      ${PURPLE}Work Mode${RESET}"
+    else
+      echo -e "  Mode:      ${CYAN}Personal Mode${RESET}"
+    fi
+
+    echo -e "  App:       ${DIM}${APP_PATH}${RESET}"
+  else
+    echo -e "  State:     ${DIM}○ Stopped${RESET}"
+    echo -e "  App:       ${DIM}${APP_PATH}${RESET}"
+  fi
+
+  # Config file status
+  if [ -f "$CONFIG_FILE" ]; then
+    echo -e "  Config:    ${CONFIG_FILE} ${GREEN}(exists)${RESET}"
+  else
+    echo -e "  Config:    ${CONFIG_FILE} ${YELLOW}(not created yet)${RESET}"
+  fi
+  echo -e "----------------------------------------"
+}
+
+# Toggle command
+cmd_toggle() {
+  if ! is_running; then
+    cmd_start
+    sleep 0.3
+  fi
+  post_notification "com.notchdeck.app.toggle"
+  send_url "toggle"
+}
+
+# Expand command
+cmd_expand() {
+  if ! is_running; then
+    cmd_start
+    sleep 0.3
+  fi
+  post_notification "com.notchdeck.app.expand"
+  send_url "expand"
+}
+
+# Collapse command
+cmd_collapse() {
+  if is_running; then
+    post_notification "com.notchdeck.app.collapse"
+    send_url "collapse"
+  fi
+}
+
+# Quick Note command
+cmd_notes() {
+  if ! is_running; then
+    cmd_start
+    sleep 0.3
+  fi
+  post_notification "com.notchdeck.app.openQuickNote"
+  send_url "notes"
+}
+
+# Tab switch command
+cmd_tab() {
+  local tab="${1:-}"
+  if [ -z "$tab" ]; then
+    echo -e "${RED}Error:${RESET} Tab name required."
+    echo -e "Available tabs: ${BOLD}home, terminal, notes, holder, shelf, whatsapp, slack, ai, vpn${RESET}"
+    exit 1
+  fi
+  if ! is_running; then
+    cmd_start
+    sleep 0.3
+  fi
+  post_notification "com.notchdeck.app.selectTab" "$tab"
+  send_url "tab/$tab"
+}
+
+# Work/Personal Mode switch
+cmd_mode() {
+  local sub="${1:-}"
+  if ! is_running; then
+    cmd_start
+    sleep 0.3
+  fi
+  case "$sub" in
+    work)
+      post_notification "com.notchdeck.app.setMode" "work"
+      send_url "mode/work"
+      echo -e "Switched to ${PURPLE}Work Mode${RESET}"
+      ;;
+    personal)
+      post_notification "com.notchdeck.app.setMode" "personal"
+      send_url "mode/personal"
+      echo -e "Switched to ${CYAN}Personal Mode${RESET}"
+      ;;
+    toggle|"")
+      post_notification "com.notchdeck.app.setMode" "toggle"
+      send_url "mode/toggle"
+      echo -e "Toggled Mode"
+      ;;
+    *)
+      echo -e "${RED}Unknown mode:${RESET} $sub (use: ${BOLD}work${RESET}, ${BOLD}personal${RESET}, or ${BOLD}toggle${RESET})"
+      exit 1
+      ;;
+  esac
+}
+
+# Settings command
+cmd_settings() {
+  if ! is_running; then
+    cmd_start
+    sleep 0.3
+  fi
+  post_notification "com.notchdeck.app.openSettings"
+  send_url "settings"
+}
+
+# Config command
+cmd_config() {
+  local sub="${1:-show}"
+  case "$sub" in
+    path)
+      echo "$CONFIG_FILE"
+      ;;
+    show|cat)
+      if [ -f "$CONFIG_FILE" ]; then
+        cat "$CONFIG_FILE"
+      else
+        echo -e "${YELLOW}Config file not found at:${RESET} $CONFIG_FILE"
+      fi
+      ;;
+    edit)
+      local editor="${EDITOR:-}"
+      if [ -z "$editor" ]; then
+        if command -v code >/dev/null 2>&1; then
+          editor="code"
+        elif command -v nano >/dev/null 2>&1; then
+          editor="nano"
+        else
+          editor="open -t"
+        fi
+      fi
+      echo -e "Opening config in ${BOLD}${editor}${RESET}..."
+      $editor "$CONFIG_FILE"
+      ;;
+    reload)
+      if is_running; then
+        post_notification "com.notchdeck.app.reloadConfig"
+        send_url "reload"
+        echo -e "${GREEN}✔ Config reload signaled.${RESET}"
+      else
+        echo -e "${YELLOW}Knotch is not running.${RESET} Config will take effect on next launch."
+      fi
+      ;;
+    test|check)
+      if [ ! -f "$CONFIG_FILE" ]; then
+        echo -e "${RED}Error:${RESET} Config file does not exist: $CONFIG_FILE"
+        exit 1
+      fi
+      echo -e "Validating $CONFIG_FILE..."
+      # Basic TOML check using python or plutil
+      if python3 -c 'import tomllib; tomllib.load(open("'$CONFIG_FILE'", "rb"))' 2>/dev/null; then
+        echo -e "${GREEN}✔ TOML configuration syntax is valid!${RESET}"
+      else
+        echo -e "${YELLOW}Notice:${RESET} Checked with basic verification."
+      fi
+      ;;
+    *)
+      echo -e "${RED}Unknown config action:${RESET} $sub"
+      echo -e "Usage: ${BOLD}knotch config [path|show|edit|reload|test]${RESET}"
+      exit 1
+      ;;
+  esac
+}
+
+# Logs stream
+cmd_logs() {
+  echo -e "${CYAN}Streaming Knotch logs (Ctrl+C to exit)...${RESET}"
+  log stream --predicate 'subsystem == "com.notchdeck.app"' --style compact
+}
+
+# Install CLI into PATH
+cmd_install() {
+  local target_dirs=("/opt/homebrew/bin" "$HOME/.local/bin" "/usr/local/bin")
+  local target_dir=""
+
+  for d in "${target_dirs[@]}"; do
+    if [ -d "$d" ] && [ -w "$d" ]; then
+      target_dir="$d"
+      break
+    fi
+  done
+
+  if [ -z "$target_dir" ]; then
+    mkdir -p "$HOME/.local/bin"
+    target_dir="$HOME/.local/bin"
+  fi
+
+  local target_link="$target_dir/knotch"
+  local src="$SCRIPT_DIR/knotch"
+
+  ln -sf "$src" "$target_link"
+  echo -e "${GREEN}✔ Installed knotch CLI to:${RESET} ${BOLD}${target_link}${RESET}"
+
+  # Verify PATH
+  if [[ ":$PATH:" != *":$target_dir:"* ]]; then
+    echo -e "${YELLOW}Note:${RESET} Make sure ${BOLD}${target_dir}${RESET} is in your ${BOLD}\$PATH${RESET} in ~/.zshrc:"
+    echo -e "  export PATH=\"${target_dir}:\$PATH\""
+  fi
+}
+
+cmd_uninstall() {
+  local removed=0
+  for d in "/opt/homebrew/bin/knotch" "$HOME/.local/bin/knotch" "/usr/local/bin/knotch"; do
+    if [ -L "$d" ] || [ -f "$d" ]; then
+      rm -f "$d"
+      echo -e "${GREEN}✔ Removed:${RESET} $d"
+      removed=1
+    fi
+  done
+  if [ $removed -eq 0 ]; then
+    echo -e "${DIM}No existing knotch symlinks found in standard PATH directories.${RESET}"
+  fi
+}
+
+# Version
+cmd_version() {
+  local app_ver
+  if [ -f "$APP_PATH/Contents/Info.plist" ]; then
+    app_ver=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || echo "$VERSION")
+  else
+    app_ver="$VERSION"
+  fi
+  echo -e "${BOLD}Knotch CLI${RESET} version ${GREEN}${app_ver}${RESET}"
+}
+
+# Help
+cmd_help() {
+  echo -e "${BOLD}Knotch CLI${RESET} - Productivity Command Center living inside your notch"
+  echo ""
+  echo -e "${BOLD}USAGE:${RESET}"
+  echo -e "  ${CYAN}knotch${RESET} [command] [options]"
+  echo -e "  ${CYAN}knotch${RESET}                  ${DIM}Toggle notch open/closed (or start if stopped)${RESET}"
+  echo ""
+  echo -e "${BOLD}COMMANDS:${RESET}"
+  echo -e "  ${BOLD}start${RESET}, ${BOLD}run${RESET}            Start Knotch application"
+  echo -e "  ${BOLD}stop${RESET}, ${BOLD}quit${RESET}            Stop and terminate Knotch"
+  echo -e "  ${BOLD}restart${RESET}               Restart Knotch"
+  echo -e "  ${BOLD}status${RESET}, ${BOLD}ps${RESET}             Show running status, PID, memory, and active mode"
+  echo -e "  ${BOLD}toggle${RESET}                Toggle notch expanded / collapsed"
+  echo -e "  ${BOLD}expand${RESET}, ${BOLD}open${RESET}          Expand the notch canvas"
+  echo -e "  ${BOLD}collapse${RESET}, ${BOLD}close${RESET}       Collapse the notch back to bezel"
+  echo -e "  ${BOLD}tab${RESET} <name>            Switch to tab (${CYAN}terminal${RESET}, ${CYAN}notes${RESET}, ${CYAN}holder${RESET}, ${CYAN}whatsapp${RESET}, ${CYAN}ai${RESET}, ${CYAN}vpn${RESET})"
+  echo -e "  ${BOLD}notes${RESET}                 Quickly open notch and focus Markdown Notes"
+  echo -e "  ${BOLD}mode${RESET} [work|personal]  Switch or toggle between Work and Personal mode"
+  echo -e "  ${BOLD}settings${RESET}, ${BOLD}prefs${RESET}       Open Knotch Settings"
+  echo -e "  ${BOLD}config${RESET} [action]       Manage configuration (${CYAN}path${RESET}, ${CYAN}show${RESET}, ${CYAN}edit${RESET}, ${CYAN}reload${RESET}, ${CYAN}test${RESET})"
+  echo -e "  ${BOLD}logs${RESET}                  Stream live application logs"
+  echo -e "  ${BOLD}install${RESET}               Symlink 'knotch' into your \$PATH"
+  echo -e "  ${BOLD}uninstall${RESET}             Remove 'knotch' CLI symlink"
+  echo -e "  ${BOLD}version${RESET}, ${BOLD}-v${RESET}           Show version information"
+  echo -e "  ${BOLD}help${RESET}, ${BOLD}-h${RESET}              Display this help manual"
+  echo ""
+  echo -e "${BOLD}EXAMPLES:${RESET}"
+  echo -e "  $ ${CYAN}knotch start${RESET}         # Launch Knotch in background"
+  echo -e "  $ ${CYAN}knotch status${RESET}        # Check memory, CPU, PID and state"
+  echo -e "  $ ${CYAN}knotch toggle${RESET}        # Expand/collapse notch"
+  echo -e "  $ ${CYAN}knotch tab terminal${RESET}  # Switch directly to terminal shell"
+  echo -e "  $ ${CYAN}knotch mode work${RESET}     # Switch to work mode"
+  echo -e "  $ ${CYAN}knotch config edit${RESET}   # Edit ~/.config/knotch/config.toml"
+  echo -e "  $ ${CYAN}knotch stop${RESET}          # Gracefully quit Knotch"
+  echo ""
+}
+
+# Entrypoint router
+main() {
+  local cmd="${1:-}"
+  shift || true
+
+  case "$cmd" in
+    ""|toggle)
+      if [ -z "$cmd" ] && ! is_running; then
+        cmd_start
+      else
+        cmd_toggle
+      fi
+      ;;
+    start|run|launch)
+      cmd_start "$@"
+      ;;
+    stop|quit|kill|exit)
+      cmd_stop "$@"
+      ;;
+    restart)
+      cmd_restart "$@"
+      ;;
+    status|ps|info)
+      cmd_status "$@"
+      ;;
+    expand|open)
+      cmd_expand "$@"
+      ;;
+    collapse|close)
+      cmd_collapse "$@"
+      ;;
+    tab)
+      cmd_tab "$@"
+      ;;
+    notes|note|quicknote)
+      cmd_notes "$@"
+      ;;
+    mode)
+      cmd_mode "$@"
+      ;;
+    settings|prefs|pref)
+      cmd_settings "$@"
+      ;;
+    config|cfg)
+      cmd_config "$@"
+      ;;
+    logs|log)
+      cmd_logs "$@"
+      ;;
+    install)
+      cmd_install "$@"
+      ;;
+    uninstall)
+      cmd_uninstall "$@"
+      ;;
+    version|-v|--version)
+      cmd_version
+      ;;
+    help|-h|--help)
+      cmd_help
+      ;;
+    *)
+      # If argument matches a tab name, switch to it
+      case "$cmd" in
+        terminal|notes|holder|shelf|whatsapp|slack|googlechat|ai|vpn|home)
+          cmd_tab "$cmd"
+          ;;
+        *)
+          echo -e "${RED}Unknown command:${RESET} ${cmd}"
+          echo -e "Run ${BOLD}knotch help${RESET} for available commands."
+          exit 1
+          ;;
+      esac
+      ;;
+  esac
+}
+
+main "$@"

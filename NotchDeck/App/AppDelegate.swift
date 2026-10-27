@@ -62,6 +62,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        // 8. IPC and CLI support (distributed notifications & URL schemes)
+        setupDistributedNotifications()
+        ensureCLISymlink()
+
         logger.info("NotchDeck ready")
     }
 
@@ -176,5 +180,135 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // MARK: - URL Scheme Handler (knotch:// & notchdeck://)
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            handleIncomingURL(url)
+        }
+    }
+
+    func handleIncomingURL(_ url: URL) {
+        guard let scheme = url.scheme?.lowercased(), scheme == "knotch" || scheme == "notchdeck" else {
+            return
+        }
+        let action = (url.host ?? url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).lowercased()
+        logger.info("Handling CLI/URL command: \(action, privacy: .public)")
+
+        switch action {
+        case "toggle":
+            panelController?.toggleExpanded()
+        case "expand", "open":
+            panelController?.expand()
+        case "collapse", "close":
+            panelController?.collapse()
+        case "notes", "quicknote":
+            panelController?.openQuickNote()
+        case "settings", "preferences":
+            openSettings()
+        case "reload":
+            configManager?.load()
+        case "quit", "stop":
+            NSApp.terminate(nil)
+        case "mode":
+            let mode = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased()
+            if mode == "work" {
+                panelController?.setWorkMode(true)
+            } else if mode == "personal" {
+                panelController?.setWorkMode(false)
+            } else {
+                panelController?.toggleWorkMode()
+            }
+        case "tab":
+            let tabId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if !tabId.isEmpty {
+                panelController?.selectWidgetTab(id: tabId)
+            }
+        default:
+            if !action.isEmpty {
+                panelController?.selectWidgetTab(id: action)
+            }
+        }
+    }
+
+    // MARK: - Distributed Notifications & CLI IPC
+
+    private func setupDistributedNotifications() {
+        let center = DistributedNotificationCenter.default()
+        let prefix = "com.notchdeck.app"
+
+        center.addObserver(forName: NSNotification.Name("\(prefix).toggle"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.panelController?.toggleExpanded()
+            }
+        }
+        center.addObserver(forName: NSNotification.Name("\(prefix).expand"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.panelController?.expand()
+            }
+        }
+        center.addObserver(forName: NSNotification.Name("\(prefix).collapse"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.panelController?.collapse()
+            }
+        }
+        center.addObserver(forName: NSNotification.Name("\(prefix).openQuickNote"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.panelController?.openQuickNote()
+            }
+        }
+        center.addObserver(forName: NSNotification.Name("\(prefix).openSettings"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.openSettings()
+            }
+        }
+        center.addObserver(forName: NSNotification.Name("\(prefix).reloadConfig"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.configManager?.load()
+            }
+        }
+        center.addObserver(forName: NSNotification.Name("\(prefix).quit"), object: nil, queue: .main) { _ in
+            Task { @MainActor in
+                NSApp.terminate(nil)
+            }
+        }
+        center.addObserver(forName: NSNotification.Name("\(prefix).selectTab"), object: nil, queue: .main) { [weak self] note in
+            let tab = (note.userInfo?["tab"] as? String) ?? (note.object as? String)
+            if let tab {
+                Task { @MainActor [weak self] in
+                    self?.panelController?.selectWidgetTab(id: tab)
+                }
+            }
+        }
+        center.addObserver(forName: NSNotification.Name("\(prefix).setMode"), object: nil, queue: .main) { [weak self] note in
+            let mode = ((note.userInfo?["mode"] as? String) ?? (note.object as? String))?.lowercased()
+            Task { @MainActor [weak self] in
+                if mode == "work" {
+                    self?.panelController?.setWorkMode(true)
+                } else if mode == "personal" {
+                    self?.panelController?.setWorkMode(false)
+                } else {
+                    self?.panelController?.toggleWorkMode()
+                }
+            }
+        }
+    }
+
+    private func ensureCLISymlink() {
+        let fm = FileManager.default
+        let home = fm.homeDirectoryForCurrentUser
+        let localBin = home.appendingPathComponent(".local").appendingPathComponent("bin")
+        let symlinkPath = localBin.appendingPathComponent("knotch")
+
+        if fm.fileExists(atPath: localBin.path) && !fm.fileExists(atPath: symlinkPath.path) {
+            let bundleURL = Bundle.main.bundleURL
+            let cliInBundle = bundleURL.appendingPathComponent("Contents/Resources/bin/knotch")
+            if fm.fileExists(atPath: cliInBundle.path) {
+                try? fm.createSymbolicLink(at: symlinkPath, withDestinationURL: cliInBundle)
+                logger.info("Symlinked knotch CLI into ~/.local/bin/knotch")
+            }
+        }
     }
 }
